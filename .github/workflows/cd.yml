@@ -1,0 +1,132 @@
+name: CD
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      flutter-version: ${{ steps.versions.outputs.flutter-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: versions
+        name: Read pinned Flutter version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path('.fvmrc').read_text())
+          print(f"flutter-version={config['flutter']}")
+          PY
+
+  backend-images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image_name: crmhotel-api
+            dockerfile: backend/docker/api.Dockerfile
+          - image_name: crmhotel-worker
+            dockerfile: backend/docker/worker.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image_name }}
+          tags: |
+            type=ref,event=branch
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push ${{ matrix.image_name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  frontend-image:
+    runs-on: ubuntu-latest
+    needs: prepare
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.prepare.outputs.flutter-version }}
+          cache: true
+
+      - name: Verify Flutter and Dart versions
+        working-directory: frontend
+        run: |
+          flutter --version --machine > /tmp/flutter-version.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          version = json.loads(Path('/tmp/flutter-version.json').read_text())
+          framework = version['frameworkVersion']
+          dart = version['dartSdkVersion']
+          if not framework.startswith('3.41.'):
+            raise SystemExit(f'Expected Flutter 3.41.x, got {framework}')
+          if not dart.startswith('3.11.'):
+            raise SystemExit(f'Expected Dart 3.11.x, got {dart}')
+          print(f'Flutter {framework} / Dart {dart}')
+          PY
+
+      - name: Build frontend web bundle
+        working-directory: frontend
+        run: |
+          flutter pub get
+          flutter build web
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/crmhotel-frontend
+          tags: |
+            type=ref,event=branch
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/docker/web.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      flutter-version: ${{ steps.versions.outputs.flutter-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: versions
+        name: Read pinned Flutter version
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path('.fvmrc').read_text())
+          print(f"flutter-version={config['flutter']}")
+          PY
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: sqlite:///./test.db
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Reset backend test database
+        run: rm -f test.db
+
+      - name: Lint backend
+        run: python -m ruff check .
+
+      - name: Run migrations
+        run: python -m alembic upgrade head
+
+      - name: Run backend tests
+        run: python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    needs: prepare
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      EXPECTED_DART_PREFIX: 3.11.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.prepare.outputs.flutter-version }}
+          cache: true
+
+      - name: Verify Flutter and Dart versions
+        run: |
+          flutter --version --machine > /tmp/flutter-version.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = json.loads(Path('/tmp/flutter-version.json').read_text())
+          framework = version['frameworkVersion']
+          dart = version['dartSdkVersion']
+          if not framework.startswith('3.41.'):
+            raise SystemExit(f'Expected Flutter 3.41.x, got {framework}')
+          if not dart.startswith(os.environ['EXPECTED_DART_PREFIX']):
+            raise SystemExit(f"Expected Dart {os.environ['EXPECTED_DART_PREFIX']}x, got {dart}")
+          print(f'Flutter {framework} / Dart {dart}')
+          PY
+
+      - name: Install frontend dependencies
+        run: flutter pub get
+
+      - name: Analyze frontend
+        run: flutter analyze
+
+      - name: Run frontend tests
+        run: flutter test
+
+      - name: Build frontend web bundle
+        run: flutter build web
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [prepare, backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ needs.prepare.outputs.flutter-version }}
+          cache: true
+
+      - name: Verify Flutter and Dart versions
+        working-directory: frontend
+        run: |
+          flutter --version --machine > /tmp/flutter-version.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          version = json.loads(Path('/tmp/flutter-version.json').read_text())
+          framework = version['frameworkVersion']
+          dart = version['dartSdkVersion']
+          if not framework.startswith('3.41.'):
+            raise SystemExit(f'Expected Flutter 3.41.x, got {framework}')
+          if not dart.startswith('3.11.'):
+            raise SystemExit(f'Expected Dart 3.11.x, got {dart}')
+          print(f'Flutter {framework} / Dart {dart}')
+          PY
+
+      - name: Build frontend web bundle for Docker
+        working-directory: frontend
+        run: |
+          flutter pub get
+          flutter build web
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/docker/api.Dockerfile
+          push: false
+          tags: crmhotel-api:ci
+
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/docker/worker.Dockerfile
+          push: false
+          tags: crmhotel-worker:ci
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/docker/web.Dockerfile
+          push: false
+          tags: crmhotel-frontend:ci

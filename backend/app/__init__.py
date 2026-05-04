@@ -1,0 +1,1 @@
+"""CrmHotel backend package."""
