@@ -61,3 +61,10 @@ class AccessOverrideEffect(str, Enum):
 class OperationTeamType(str, Enum):
     housekeeping = "housekeeping"
     maintenance = "maintenance"
+
+
+class NotificationKind(str, Enum):
+    broadcast = "broadcast"
+    housekeeping = "housekeeping"
+    maintenance = "maintenance"
+    auth = "auth"

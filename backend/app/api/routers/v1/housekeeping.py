@@ -19,7 +19,12 @@ from app.core.access_control import (
     get_operation_team_ids_for_user,
 )
 from app.core.db import get_session
-from app.core.enums import OperationTeamType, TaskStatus, UnitStatus
+from app.core.enums import NotificationKind, OperationTeamType, TaskStatus, UnitStatus
+from app.core.notifications import (
+    assignment_recipient_user_ids,
+    create_notifications,
+    user_ids_with_permissions,
+)
 from app.domain.shared.exceptions import DomainError
 from app.infrastructure.persistence.models import (
     HousekeepingTask,
@@ -40,6 +45,37 @@ from app.schemas.operations import (
 router = APIRouter()
 
 HOUSEKEEPING_ASSIGNEE_PERMISSIONS = frozenset({"housekeeping.view", "housekeeping.complete"})
+
+
+def _notify_housekeeping_event(
+    session: Session,
+    *,
+    actor_user_id: str,
+    task: HousekeepingTask,
+    title: str,
+    body: str,
+) -> None:
+    manager_ids = set(
+        user_ids_with_permissions(session, {"notifications.manage"}, exclude_user_ids={actor_user_id})
+    )
+    assignment_ids = set(
+        assignment_recipient_user_ids(
+            session,
+            assigned_user_id=task.assigned_user_id,
+            assigned_team_id=task.assigned_team_id,
+        )
+    )
+    assignment_ids.discard(actor_user_id)
+    create_notifications(
+        session,
+        recipient_user_ids=manager_ids | assignment_ids,
+        actor_user_id=actor_user_id,
+        kind=NotificationKind.housekeeping,
+        title=title,
+        body=body,
+        resource_type="housekeeping_task",
+        resource_id=task.id,
+    )
 
 
 def _actor_can_manage_assignments(user: CurrentUser) -> bool:
@@ -201,7 +237,16 @@ def list_assignable_users(
 
 @router.get("/tasks", response_model=list[HousekeepingTaskRead])
 def list_tasks(
-    user: Annotated[CurrentUser, Depends(require_permissions("housekeeping.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(
+            require_permissions(
+                "housekeeping.view",
+                "housekeeping.complete",
+                "housekeeping.manage",
+            )
+        ),
+    ],
     session: Annotated[Session, Depends(get_session)],
 ) -> list[HousekeepingTaskRead]:
     unit_scope_ids = resolve_unit_scope_ids(session, user)
@@ -239,6 +284,13 @@ def create_task(
         unit.status = UnitStatus.pending_cleaning
         session.add(unit)
     session.add(task)
+    _notify_housekeeping_event(
+        session,
+        actor_user_id=user["id"],
+        task=task,
+        title="Housekeeping task created",
+        body=f"A housekeeping task was created for unit {unit.code}.",
+    )
     session.commit()
     session.refresh(task)
     return _serialize_task(session, task)
@@ -262,6 +314,16 @@ def assign_task(
         assigned_team_id=payload.assigned_team_id,
     )
     session.add(task)
+    unit = session.get(Unit, task.unit_id)
+    _notify_housekeeping_event(
+        session,
+        actor_user_id=user["id"],
+        task=task,
+        title="Housekeeping task assigned",
+        body=(
+            f"Housekeeping task for unit {unit.code if unit else task.unit_id} was reassigned."
+        ),
+    )
     session.commit()
     session.refresh(task)
     return _serialize_task(session, task)
@@ -306,6 +368,13 @@ def complete_task(
         unit.status = UnitStatus.ready
         session.add(unit)
     session.add(task)
+    _notify_housekeeping_event(
+        session,
+        actor_user_id=user["id"],
+        task=task,
+        title="Housekeeping task completed",
+        body=f"Housekeeping task for unit {unit.code if unit else task.unit_id} is complete.",
+    )
     session.commit()
     session.refresh(task)
     return _serialize_task(session, task)

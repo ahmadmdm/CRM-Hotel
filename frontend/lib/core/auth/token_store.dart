@@ -81,7 +81,7 @@ class SecureTokenStore implements TokenStore {
     await _storage.write(key: _refreshTokenKey, value: session.refreshToken);
     await _storage.write(
       key: _rolesKey,
-      value: session.roles.map((role) => role.code).join(','),
+      value: session.roles.join(','),
     );
     await _storage.write(
       key: _permissionsKey,

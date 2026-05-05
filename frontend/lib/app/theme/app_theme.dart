@@ -30,6 +30,8 @@ ThemeData buildAppTheme() {
 
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'ThmanyahSans',
+    fontFamilyFallback: appFontFallback,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.fog,
     textTheme: buildAppTextTheme(),
@@ -54,7 +56,27 @@ ThemeData buildAppTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.92),
-      hintStyle: TextStyle(color: AppColors.slate.withValues(alpha: 0.78)),
+      hintStyle: TextStyle(
+        fontFamily: 'ThmanyahSans',
+        fontFamilyFallback: appFontFallback,
+        color: AppColors.slate.withValues(alpha: 0.78),
+      ),
+      labelStyle: const TextStyle(
+        fontFamily: 'ThmanyahSans',
+        fontFamilyFallback: appFontFallback,
+      ),
+      helperStyle: const TextStyle(
+        fontFamily: 'ThmanyahSans',
+        fontFamilyFallback: appFontFallback,
+      ),
+      errorStyle: const TextStyle(
+        fontFamily: 'ThmanyahSans',
+        fontFamilyFallback: appFontFallback,
+      ),
+      floatingLabelStyle: const TextStyle(
+        fontFamily: 'ThmanyahSans',
+        fontFamilyFallback: appFontFallback,
+      ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.field),
@@ -73,6 +95,11 @@ ThemeData buildAppTheme() {
       style: FilledButton.styleFrom(
         backgroundColor: AppColors.midnight,
         foregroundColor: Colors.white,
+        textStyle: const TextStyle(
+          fontFamily: 'ThmanyahSans',
+          fontFamilyFallback: appFontFallback,
+          fontWeight: FontWeight.w700,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
@@ -80,9 +107,26 @@ ThemeData buildAppTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.midnight,
+        textStyle: const TextStyle(
+          fontFamily: 'ThmanyahSans',
+          fontFamilyFallback: appFontFallback,
+          fontWeight: FontWeight.w700,
+        ),
         side: const BorderSide(color: AppColors.mist),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+    ),
+    segmentedButtonTheme: const SegmentedButtonThemeData(
+      style: ButtonStyle(
+        textStyle: WidgetStatePropertyAll(
+          TextStyle(
+            fontFamily: 'ThmanyahSans',
+            fontFamilyFallback: appFontFallback,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        visualDensity: VisualDensity.compact,
       ),
     ),
     chipTheme: ChipThemeData(
@@ -95,6 +139,7 @@ ThemeData buildAppTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       side: const BorderSide(color: AppColors.mist),
       labelStyle: const TextStyle(
+        fontFamilyFallback: appFontFallback,
         color: AppColors.ink,
         fontWeight: FontWeight.w600,
       ),
@@ -104,7 +149,23 @@ ThemeData buildAppTheme() {
       indicatorColor: AppColors.sand,
       surfaceTintColor: Colors.transparent,
       labelTextStyle: const WidgetStatePropertyAll(
-        TextStyle(fontWeight: FontWeight.w700),
+        TextStyle(
+          fontFamilyFallback: appFontFallback,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.midnight,
+      contentTextStyle: const TextStyle(
+        fontFamily: 'ThmanyahSans',
+        fontFamilyFallback: appFontFallback,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
     ),
   );

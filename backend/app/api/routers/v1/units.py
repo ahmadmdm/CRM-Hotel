@@ -143,7 +143,10 @@ def list_amenity_catalog(
 
 @router.get("", response_model=PaginatedResponse[UnitListItem])
 def list_units(
-    user: Annotated[CurrentUser, Depends(require_permissions("units.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("units.view", "units.manage")),
+    ],
     pagination: Annotated[PaginationParams, Depends(pagination_params)],
     session: Annotated[Session, Depends(get_session)],
     status: Annotated[UnitStatus | None, Query()] = None,
@@ -182,7 +185,10 @@ def create_unit(
 @router.get("/{unit_id}", response_model=UnitDetailRead)
 def get_unit(
     unit_id: str,
-    user: Annotated[CurrentUser, Depends(require_permissions("units.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("units.view", "units.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
 ) -> UnitDetailRead:
     ensure_unit_in_scope(unit_id, resolve_unit_scope_ids(session, user))

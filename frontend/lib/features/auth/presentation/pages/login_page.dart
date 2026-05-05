@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,6 +20,7 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
+  String? _validationError;
 
   @override
   void initState() {
@@ -34,16 +36,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  void _submit() {
+    final l10n = context.l10n;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _validationError = l10n.isArabic
+            ? 'أدخل البريد الإلكتروني وكلمة المرور قبل محاولة تسجيل الدخول.'
+            : 'Enter both the email address and password before signing in.';
+      });
+      return;
+    }
+
+    if (_validationError != null) {
+      setState(() {
+        _validationError = null;
+      });
+    }
+
+    ref
+        .read(sessionControllerProvider.notifier)
+        .signIn(email, password);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final currentLocale = ref.watch(localeControllerProvider);
     final sessionState = ref.watch(sessionControllerProvider);
     final isLoading = sessionState.isLoading;
-    final errorText = sessionState.hasError
+    final errorText = _validationError ??
+      (sessionState.hasError
         ? _localizedLoginError(sessionState.error, l10n)
-        : null;
-    final isDesktop = MediaQuery.sizeOf(context).width >= 960;
+        : null);
 
     final loginPanel = Container(
       constraints: const BoxConstraints(maxWidth: 460),
@@ -63,21 +90,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.sand,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              l10n.unifiedAccess,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-          const SizedBox(height: 18),
           Text(
-            l10n.signInTitle,
-            style: Theme.of(context).textTheme.headlineMedium,
+            'CRMHOTEL',
+            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  color: AppColors.midnight,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -105,6 +122,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.username, AutofillHints.email],
+            onChanged: (_) {
+              if (_validationError == null) {
+                return;
+              }
+              setState(() {
+                _validationError = null;
+              });
+            },
             decoration: InputDecoration(
               labelText: l10n.emailLabel,
               hintText: l10n.emailHint,
@@ -115,6 +142,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           TextField(
             controller: _passwordController,
             obscureText: true,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.password],
+            onChanged: (_) {
+              if (_validationError == null) {
+                return;
+              }
+              setState(() {
+                _validationError = null;
+              });
+            },
+            onSubmitted: (_) => isLoading ? null : _submit(),
             decoration: InputDecoration(
               labelText: l10n.passwordLabel,
               hintText: l10n.passwordHint,
@@ -123,26 +161,47 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
           if (errorText != null) ...[
             const SizedBox(height: 14),
-            Text(
-              errorText,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.error.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.error.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      errorText,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: isLoading
-                  ? null
-                  : () => ref
-                        .read(sessionControllerProvider.notifier)
-                        .signIn(
-                          _emailController.text.trim(),
-                          _passwordController.text,
-                        ),
-              child: Text(
-                isLoading ? l10n.signingIn : l10n.signInCta,
-              ),
+              onPressed: isLoading ? null : _submit,
+              child: Text(isLoading ? l10n.signingIn : l10n.signInCta),
             ),
           ),
           const SizedBox(height: 18),
@@ -178,153 +237,54 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1180),
-                child: isDesktop
-                    ? Row(
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                end: 32,
-                              ),
-                              child: _LoginHero(redirectTo: widget.redirectTo),
-                            ),
-                          ),
-                          loginPanel,
-                        ],
-                      )
-                    : Column(
-                        children: [
-                          const _LoginHero(),
-                          const SizedBox(height: 24),
-                          loginPanel,
-                        ],
-                      ),
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: loginPanel,
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _LoginHero extends StatelessWidget {
-  const _LoginHero({this.redirectTo});
-
-  final String? redirectTo;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(34),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.midnight, Color(0xFF243B72), AppColors.sky],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.midnight.withValues(alpha: 0.22),
-            blurRadius: 40,
-            offset: const Offset(0, 24),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: Colors.white.withValues(alpha: 0.14),
-            ),
-            child: const Icon(Icons.hotel_class, color: Colors.white, size: 30),
-          ),
-          const SizedBox(height: 28),
-          Text(
-            'CrmHotel',
-            style: Theme.of(
-              context,
-            ).textTheme.displaySmall?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            l10n.loginHeroSubtitle,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.92),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            l10n.loginHeroBody,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.80),
-            ),
-          ),
-          const SizedBox(height: 28),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _HeroPill(label: l10n.loginHeroPillUnified),
-              _HeroPill(label: l10n.loginHeroPillMatrix),
-              _HeroPill(label: l10n.loginHeroPillOffline),
-            ],
-          ),
-          const SizedBox(height: 28),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _HeroMetric(label: l10n.modulesLabel, value: '8+'),
-              _HeroMetric(
-                label: l10n.accessLayersLabel,
-                value: l10n.roleAndOverride,
-              ),
-              _HeroMetric(
-                label: l10n.readinessModeLabel,
-                value: l10n.operationalReadiness,
-              ),
-            ],
-          ),
-          if (redirectTo != null) ...[
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.route_outlined, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      l10n.requiredRouteAfterLogin(redirectTo!),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }
 }
 
 String _localizedLoginError(Object? error, AppLocalizations l10n) {
+  if (error is DioException) {
+    final statusCode = error.response?.statusCode;
+    final responseData = error.response?.data;
+    final detail = responseData is Map<String, dynamic>
+        ? '${responseData['detail'] ?? responseData['message'] ?? ''}'
+        : '$responseData';
+    final lowerDetail = detail.toLowerCase();
+
+    if (statusCode == 422 ||
+        lowerDetail.contains('field required') ||
+        lowerDetail.contains('valid email') ||
+        lowerDetail.contains('email') ||
+        lowerDetail.contains('password')) {
+      return l10n.isArabic
+          ? 'تحقق من إدخال البريد الإلكتروني وكلمة المرور بصيغة صحيحة ثم أعد المحاولة.'
+          : 'Check that the email address and password are filled in correctly, then try again.';
+    }
+
+    if (statusCode == 401 ||
+        statusCode == 400 ||
+        lowerDetail.contains('invalid') ||
+        lowerDetail.contains('credential')) {
+      return l10n.isArabic
+          ? 'بيانات الدخول غير صحيحة. تحقق من اسم المستخدم أو كلمة المرور ثم أعد المحاولة.'
+          : 'The login credentials are invalid. Check the username or password and try again.';
+    }
+
+    if (error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout) {
+      return l10n.isArabic
+          ? 'تعذر الاتصال بالخادم حالياً. تحقق من الشبكة ثم أعد المحاولة.'
+          : 'Unable to reach the server right now. Check the network and try again.';
+    }
+  }
+
   final raw = '$error';
   final lower = raw.toLowerCase();
 
@@ -347,63 +307,3 @@ String _localizedLoginError(Object? error, AppLocalizations l10n) {
   return raw;
 }
 
-class _HeroPill extends StatelessWidget {
-  const _HeroPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: Colors.white.withValues(alpha: 0.12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: Colors.white),
-      ),
-    );
-  }
-}
-
-class _HeroMetric extends StatelessWidget {
-  const _HeroMetric({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 180,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withValues(alpha: 0.12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.84),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

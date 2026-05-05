@@ -13,6 +13,8 @@ from app.core.access_control import (
 )
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.core.enums import NotificationKind
+from app.core.notifications import create_notifications, user_ids_with_permissions
 from app.core.security import create_access_token, verify_password
 from app.infrastructure.persistence.models import Role, User, UserRole
 from app.schemas.auth import AuthenticatedUserResponse, LoginRequest, TokenResponse
@@ -68,6 +70,22 @@ def login(
         permissions=access_profile.effective_permission_codes,
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
+    manager_ids = user_ids_with_permissions(
+        session,
+        {"notifications.manage"},
+        exclude_user_ids={user.id},
+    )
+    create_notifications(
+        session,
+        recipient_user_ids=manager_ids,
+        actor_user_id=user.id,
+        kind=NotificationKind.auth,
+        title="User signed in",
+        body=f"{user.full_name} signed in to the dashboard.",
+        resource_type="auth_session",
+        resource_id=user.id,
+    )
+    session.commit()
     return TokenResponse(
         access_token=access_token,
         refresh_token="scaffold-refresh-token",
@@ -148,5 +166,24 @@ def refresh(
 
 
 @router.post("/logout")
-def logout(_: CurrentAuthenticatedUser) -> dict[str, str]:
+def logout(
+    user: CurrentAuthenticatedUser,
+    session: Annotated[Session, Depends(get_session)],
+) -> dict[str, str]:
+    manager_ids = user_ids_with_permissions(
+        session,
+        {"notifications.manage"},
+        exclude_user_ids={user["id"]},
+    )
+    create_notifications(
+        session,
+        recipient_user_ids=manager_ids,
+        actor_user_id=user["id"],
+        kind=NotificationKind.auth,
+        title="User signed out",
+        body=f"{user['full_name']} signed out from the dashboard.",
+        resource_type="auth_session",
+        resource_id=user["id"],
+    )
+    session.commit()
     return {"status": "logged_out"}

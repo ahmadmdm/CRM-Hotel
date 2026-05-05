@@ -19,7 +19,12 @@ from app.core.access_control import (
     get_operation_team_ids_for_user,
 )
 from app.core.db import get_session
-from app.core.enums import OperationTeamType, TicketStatus, UnitStatus
+from app.core.enums import NotificationKind, OperationTeamType, TicketStatus, UnitStatus
+from app.core.notifications import (
+    assignment_recipient_user_ids,
+    create_notifications,
+    user_ids_with_permissions,
+)
 from app.domain.shared.exceptions import DomainError
 from app.infrastructure.persistence.models import (
     MaintenanceTicket,
@@ -39,6 +44,37 @@ from app.schemas.operations import (
 router = APIRouter()
 
 MAINTENANCE_ASSIGNEE_PERMISSIONS = frozenset({"maintenance.view", "maintenance.manage"})
+
+
+def _notify_maintenance_event(
+    session: Session,
+    *,
+    actor_user_id: str,
+    ticket: MaintenanceTicket,
+    title: str,
+    body: str,
+) -> None:
+    manager_ids = set(
+        user_ids_with_permissions(session, {"notifications.manage"}, exclude_user_ids={actor_user_id})
+    )
+    assignment_ids = set(
+        assignment_recipient_user_ids(
+            session,
+            assigned_user_id=ticket.assigned_user_id,
+            assigned_team_id=ticket.assigned_team_id,
+        )
+    )
+    assignment_ids.discard(actor_user_id)
+    create_notifications(
+        session,
+        recipient_user_ids=manager_ids | assignment_ids,
+        actor_user_id=actor_user_id,
+        kind=NotificationKind.maintenance,
+        title=title,
+        body=body,
+        resource_type="maintenance_ticket",
+        resource_id=ticket.id,
+    )
 
 
 def _actor_can_manage_assignments(user: CurrentUser) -> bool:
@@ -201,7 +237,10 @@ def list_assignable_users(
 
 @router.get("/tickets", response_model=list[MaintenanceTicketRead])
 def list_tickets(
-    user: Annotated[CurrentUser, Depends(require_permissions("maintenance.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("maintenance.view", "maintenance.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
 ) -> list[MaintenanceTicketRead]:
     unit_scope_ids = resolve_unit_scope_ids(session, user)
@@ -239,6 +278,13 @@ def create_ticket(
     if unit:
         unit.status = UnitStatus.maintenance
         session.add(unit)
+    _notify_maintenance_event(
+        session,
+        actor_user_id=user["id"],
+        ticket=ticket,
+        title="Maintenance ticket created",
+        body=f"A maintenance ticket was created for unit {unit.code if unit else payload.unit_id}.",
+    )
     session.commit()
     session.refresh(ticket)
     return _serialize_ticket(session, ticket)
@@ -262,6 +308,14 @@ def assign_ticket(
         assigned_team_id=payload.assigned_team_id,
     )
     session.add(ticket)
+    unit = session.get(Unit, ticket.unit_id)
+    _notify_maintenance_event(
+        session,
+        actor_user_id=user["id"],
+        ticket=ticket,
+        title="Maintenance ticket assigned",
+        body=f"Maintenance ticket for unit {unit.code if unit else ticket.unit_id} was reassigned.",
+    )
     session.commit()
     session.refresh(ticket)
     return _serialize_ticket(session, ticket)
@@ -307,6 +361,13 @@ def resolve_ticket(
     if unit and not remaining:
         unit.status = UnitStatus.ready
         session.add(unit)
+    _notify_maintenance_event(
+        session,
+        actor_user_id=user["id"],
+        ticket=ticket,
+        title="Maintenance ticket resolved",
+        body=f"Maintenance ticket for unit {unit.code if unit else ticket.unit_id} was resolved.",
+    )
     session.commit()
     session.refresh(ticket)
     return _serialize_ticket(session, ticket)

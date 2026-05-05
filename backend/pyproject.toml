@@ -10,6 +10,7 @@ dependencies = [
   "email-validator>=2.2.0",
   "eval-type-backport>=0.2.2",
   "fastapi>=0.116.0",
+  "httpx>=0.28.1",
   "passlib[bcrypt]>=1.7.4",
   "psycopg[binary]>=3.2.9",
   "pydantic-settings>=2.10.1",
@@ -21,7 +22,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "httpx>=0.28.1",
   "pytest>=8.4.1",
   "pytest-asyncio>=1.1.0",
   "pytest-cov>=6.2.1",

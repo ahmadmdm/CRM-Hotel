@@ -61,73 +61,81 @@ class DashboardPage extends ConsumerWidget {
                   ],
                 ),
               ),
-              child: Wrap(
-                spacing: 24,
-                runSpacing: 24,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 460,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            color: Colors.white.withValues(alpha: 0.14),
-                          ),
-                          child: Text(
-                            l10n.isArabic
-                                ? 'ملخص تنفيذي فوري'
-                                : 'Executive Snapshot',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          l10n.isArabic
-                              ? 'رؤية قيادة أكثر حدة للإشغال والإيراد ونقاط التعثر التشغيلي.'
-                              : 'A sharper command view for occupancy, revenue, and operational drag.',
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(color: Colors.white),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          l10n.isArabic
-                              ? 'تابع صحة التشغيل لحظياً وحدد أين يجب أن يتدخل الفريق الإداري أو التشغيلي في اللحظة التالية.'
-                              : 'Track operational health live and identify where leadership or field teams should intervene next.',
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.82),
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final summaryWidth = constraints.maxWidth < 780
+                      ? constraints.maxWidth
+                      : 460.0;
+
+                  return Wrap(
+                    spacing: 24,
+                    runSpacing: 24,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      _HeroStat(
-                        label: l10n.isArabic ? 'الإشغال' : 'Occupancy',
-                        value: l10n.formatPercent(data.occupancyRate),
+                      SizedBox(
+                        width: summaryWidth,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(999),
+                                color: Colors.white.withValues(alpha: 0.14),
+                              ),
+                              child: Text(
+                                l10n.isArabic
+                                    ? 'ملخص التشغيل'
+                                    : 'Operations Summary',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: Colors.white),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              l10n.isArabic
+                                  ? 'متابعة الإشغال والإيراد والحجوزات والمهام التي تحتاج تدخلاً الآن.'
+                                  : 'Track occupancy, revenue, bookings, and the tasks that need attention now.',
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              l10n.isArabic
+                                  ? 'راجع المؤشرات الأساسية بسرعة وحدد أين يحتاج التشغيل أو الصيانة أو الإشراف إلى متابعة مباشرة.'
+                                  : 'Review the core operating metrics quickly and see where operations, maintenance, or housekeeping need direct follow-up.',
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.82),
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                      _HeroStat(
-                        label: l10n.isArabic ? 'الإيراد' : 'Revenue',
-                        value: l10n.formatCurrency(data.totalRevenue),
-                      ),
-                      _HeroStat(
-                        label: l10n.isArabic ? 'الحجوزات' : 'Bookings',
-                        value: l10n.formatNumber(data.activeBookings),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          _HeroStat(
+                            label: l10n.isArabic ? 'الإشغال' : 'Occupancy',
+                            value: l10n.formatPercent(data.occupancyRate),
+                          ),
+                          _HeroStat(
+                            label: l10n.isArabic ? 'الإيراد' : 'Revenue',
+                            value: l10n.formatCurrency(data.totalRevenue),
+                          ),
+                          _HeroStat(
+                            label: l10n.isArabic ? 'الحجوزات' : 'Bookings',
+                            value: l10n.formatNumber(data.activeBookings),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 18),

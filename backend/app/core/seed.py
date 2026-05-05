@@ -15,7 +15,7 @@ from app.core.enums import (
     TicketStatus,
     UnitStatus,
 )
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.infrastructure.persistence.models import (
     Amenity,
     Booking,
@@ -140,7 +140,7 @@ PERMISSION_AUDIT_USERS = tuple(
     (
         definition.code,
         f"perm-{definition.code.replace('.', '-')}@crmhotel.example.com",
-        f"Permission Audit · {definition.name}",
+        f"Permission Audit - {definition.name}",
     )
     for definition in PERMISSION_CATALOG
 )
@@ -197,14 +197,38 @@ def _ensure_demo_users(
     roles_by_code: dict[str, Role],
     password_hash: str,
 ) -> None:
+    settings = get_settings()
     users_by_email = {user.email: user for user in session.exec(select(User)).all()}
-    created_users = False
+    changed_users = False
     for email, full_name, _ in DEMO_USERS:
-        if email in users_by_email:
+        user = users_by_email.get(email)
+        if user is None:
+            session.add(
+                User(
+                    email=email,
+                    full_name=full_name,
+                    password_hash=password_hash,
+                    is_active=True,
+                )
+            )
+            changed_users = True
             continue
-        session.add(User(email=email, full_name=full_name, password_hash=password_hash))
-        created_users = True
-    if created_users:
+
+        user_changed = False
+        if user.full_name != full_name:
+            user.full_name = full_name
+            user_changed = True
+        if not user.is_active:
+            user.is_active = True
+            user_changed = True
+        if not verify_password(settings.demo_user_password, user.password_hash):
+            user.password_hash = password_hash
+            user_changed = True
+        if user_changed:
+            session.add(user)
+            changed_users = True
+
+    if changed_users:
         session.commit()
         users_by_email = {user.email: user for user in session.exec(select(User)).all()}
 
@@ -225,19 +249,36 @@ def _ensure_permission_audit_users(
     *,
     password_hash: str,
 ) -> None:
+    settings = get_settings()
     users_by_email = {user.email: user for user in session.exec(select(User)).all()}
-    created_users = False
+    changed_users = False
     for _, email, full_name in PERMISSION_AUDIT_USERS:
         user = users_by_email.get(email)
         if user is None:
-            session.add(User(email=email, full_name=full_name, password_hash=password_hash))
-            created_users = True
+            session.add(
+                User(
+                    email=email,
+                    full_name=full_name,
+                    password_hash=password_hash,
+                    is_active=True,
+                )
+            )
+            changed_users = True
             continue
+        user_changed = False
         if user.full_name != full_name:
             user.full_name = full_name
+            user_changed = True
+        if not user.is_active:
+            user.is_active = True
+            user_changed = True
+        if not verify_password(settings.demo_user_password, user.password_hash):
+            user.password_hash = password_hash
+            user_changed = True
+        if user_changed:
             session.add(user)
-            created_users = True
-    if created_users:
+            changed_users = True
+    if changed_users:
         session.commit()
         users_by_email = {user.email: user for user in session.exec(select(User)).all()}
 
@@ -270,6 +311,53 @@ def _ensure_permission_audit_users(
             )
         )
     session.commit()
+
+
+def _ensure_super_admin_user(
+    session: Session,
+    *,
+    roles_by_code: dict[str, Role],
+) -> None:
+    settings = get_settings()
+    super_admin = session.exec(
+        select(User).where(User.email == settings.super_admin_email)
+    ).first()
+    if super_admin is None:
+        super_admin = User(
+            email=settings.super_admin_email,
+            full_name="System Administrator",
+            password_hash=hash_password(settings.super_admin_password),
+            is_active=True,
+        )
+        session.add(super_admin)
+        session.commit()
+        session.refresh(super_admin)
+    elif not super_admin.is_active:
+        super_admin.is_active = True
+        session.add(super_admin)
+        session.commit()
+
+    super_admin_role = roles_by_code["super_admin"]
+    existing_link = session.exec(
+        select(UserRole).where(
+            UserRole.user_id == super_admin.id,
+            UserRole.role_id == super_admin_role.id,
+        )
+    ).first()
+    if existing_link is None:
+        session.add(UserRole(user_id=super_admin.id, role_id=super_admin_role.id))
+        session.commit()
+
+
+def ensure_access_control_baseline(session: Session) -> None:
+    if session.exec(select(Role)).first() is None:
+        roles = [Role(code=code, name=name) for code, name in ROLE_NAMES.items()]
+        session.add_all(roles)
+        session.commit()
+
+    roles_by_code = {role.code: role for role in session.exec(select(Role)).all()}
+    _ensure_permissions_and_role_mappings(session, roles_by_code=roles_by_code)
+    _ensure_super_admin_user(session, roles_by_code=roles_by_code)
 
 
 def _ensure_demo_unit_assignments(session: Session) -> None:
@@ -352,13 +440,9 @@ def _ensure_demo_operation_teams(session: Session) -> None:
 def seed_database(session: Session) -> None:
     settings = get_settings()
     password_hash = hash_password(settings.demo_user_password)
-    if session.exec(select(Role)).first() is None:
-        roles = [Role(code=code, name=name) for code, name in ROLE_NAMES.items()]
-        session.add_all(roles)
-        session.commit()
 
+    ensure_access_control_baseline(session)
     roles_by_code = {role.code: role for role in session.exec(select(Role)).all()}
-    _ensure_permissions_and_role_mappings(session, roles_by_code=roles_by_code)
 
     _ensure_demo_users(session, roles_by_code=roles_by_code, password_hash=password_hash)
     _ensure_permission_audit_users(session, password_hash=password_hash)

@@ -9,6 +9,7 @@ class RouteNames {
   static const bookings = '/app/bookings';
   static const crm = '/app/crm';
   static const finance = '/app/finance';
+  static const notifications = '/app/notifications';
   static const housekeeping = '/worker/housekeeping';
   static const maintenance = '/worker/maintenance';
 

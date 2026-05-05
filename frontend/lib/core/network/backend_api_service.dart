@@ -505,6 +505,34 @@ class AccessPermissionEntry {
   final String description;
 }
 
+class AccessPermissionGroup {
+  const AccessPermissionGroup({
+    required this.code,
+    required this.name,
+    required this.permissionCodes,
+    required this.isSystem,
+    required this.memberCount,
+  });
+
+  factory AccessPermissionGroup.fromJson(Map<String, dynamic> json) {
+    return AccessPermissionGroup(
+      code: json['code'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      permissionCodes: ((json['permission_codes'] as List?) ?? const [])
+          .map((item) => '$item')
+          .toList(),
+      isSystem: json['is_system'] as bool? ?? false,
+      memberCount: json['member_count'] as int? ?? 0,
+    );
+  }
+
+  final String code;
+  final String name;
+  final List<String> permissionCodes;
+  final bool isSystem;
+  final int memberCount;
+}
+
 class UserPermissionOverrideEntry {
   const UserPermissionOverrideEntry({
     required this.permissionCode,
@@ -631,6 +659,26 @@ class AccessUserDetail extends AccessUserSummary {
   final List<UserPermissionOverrideEntry> overrides;
   final List<String> assignedUnitIds;
   final List<AssignedUnitSummary> assignedUnits;
+}
+
+class AccessUserCreateInput {
+  const AccessUserCreateInput({
+    required this.fullName,
+    required this.email,
+    required this.password,
+    this.isActive = true,
+    this.roleCodes = const [],
+    this.overrides = const [],
+    this.assignedUnitIds = const [],
+  });
+
+  final String fullName;
+  final String email;
+  final String password;
+  final bool isActive;
+  final List<String> roleCodes;
+  final List<UserPermissionOverrideEntry> overrides;
+  final List<String> assignedUnitIds;
 }
 
 class OperationTeamMemberSummary {
@@ -881,6 +929,89 @@ class MaintenanceTicketSummary {
   final String? description;
   final String status;
   final String priority;
+}
+
+class NotificationFeedItem {
+  const NotificationFeedItem({
+    required this.id,
+    required this.recipientUserId,
+    required this.actorUserId,
+    required this.kind,
+    required this.title,
+    required this.body,
+    required this.resourceType,
+    required this.resourceId,
+    required this.metadataJson,
+    required this.isRead,
+    required this.readAt,
+    required this.createdAt,
+  });
+
+  factory NotificationFeedItem.fromJson(Map<String, dynamic> json) {
+    return NotificationFeedItem(
+      id: json['id'] as String? ?? '',
+      recipientUserId: json['recipient_user_id'] as String? ?? '',
+      actorUserId: json['actor_user_id'] as String?,
+      kind: json['kind'] as String? ?? 'broadcast',
+      title: json['title'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      resourceType: json['resource_type'] as String?,
+      resourceId: json['resource_id'] as String?,
+      metadataJson: json['metadata_json'] as String?,
+      isRead: json['is_read'] as bool? ?? false,
+      readAt: json['read_at'] as String?,
+      createdAt: json['created_at'] as String? ?? '',
+    );
+  }
+
+  final String id;
+  final String recipientUserId;
+  final String? actorUserId;
+  final String kind;
+  final String title;
+  final String body;
+  final String? resourceType;
+  final String? resourceId;
+  final String? metadataJson;
+  final bool isRead;
+  final String? readAt;
+  final String createdAt;
+}
+
+class NotificationStats {
+  const NotificationStats({required this.unreadCount});
+
+  factory NotificationStats.fromJson(Map<String, dynamic> json) {
+    return NotificationStats(unreadCount: json['unread_count'] as int? ?? 0);
+  }
+
+  final int unreadCount;
+}
+
+class NotificationDeliveryConfig {
+  const NotificationDeliveryConfig({
+    required this.enabled,
+    required this.appId,
+    required this.serviceWorkerPath,
+    required this.serviceWorkerScope,
+  });
+
+  factory NotificationDeliveryConfig.fromJson(Map<String, dynamic> json) {
+    return NotificationDeliveryConfig(
+      enabled: json['enabled'] as bool? ?? false,
+      appId: json['app_id'] as String? ?? '',
+      serviceWorkerPath:
+          json['service_worker_path'] as String? ??
+          'push/onesignal/OneSignalSDKWorker.js',
+      serviceWorkerScope:
+          json['service_worker_scope'] as String? ?? '/push/onesignal/',
+    );
+  }
+
+  final bool enabled;
+  final String appId;
+  final String serviceWorkerPath;
+  final String serviceWorkerScope;
 }
 
 class BackendApiService {
@@ -1178,12 +1309,87 @@ class BackendApiService {
         .toList();
   }
 
+  Future<List<AccessPermissionGroup>> fetchPermissionGroups() async {
+    final response = await _dio.get<List<dynamic>>('access/permission-groups');
+    return (response.data ?? const [])
+        .cast<Map>()
+        .map(
+          (item) => AccessPermissionGroup.fromJson(item.cast<String, dynamic>()),
+        )
+        .toList();
+  }
+
+  Future<AccessPermissionGroup> createPermissionGroup({
+    required String name,
+    required List<String> permissionCodes,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'access/permission-groups',
+      data: {
+        'name': name,
+        'permission_codes': permissionCodes,
+      },
+    );
+    return AccessPermissionGroup.fromJson(
+      response.data ?? const <String, dynamic>{},
+    );
+  }
+
+  Future<AccessPermissionGroup> updatePermissionGroup(
+    String roleCode, {
+    required String name,
+    required List<String> permissionCodes,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      'access/permission-groups/$roleCode',
+      data: {
+        'name': name,
+        'permission_codes': permissionCodes,
+      },
+    );
+    return AccessPermissionGroup.fromJson(
+      response.data ?? const <String, dynamic>{},
+    );
+  }
+
+  Future<void> deletePermissionGroup(String roleCode) async {
+    await _dio.delete('access/permission-groups/$roleCode');
+  }
+
   Future<List<AccessUserSummary>> fetchAccessUsers() async {
     final response = await _dio.get<List<dynamic>>('users');
     return (response.data ?? const [])
         .cast<Map>()
         .map((item) => AccessUserSummary.fromJson(item.cast<String, dynamic>()))
         .toList();
+  }
+
+  Future<AccessUserDetail> createAccessUser(AccessUserCreateInput input) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'users',
+      data: {
+        'full_name': input.fullName,
+        'email': input.email,
+        'password': input.password,
+        'is_active': input.isActive,
+        'role_codes': input.roleCodes,
+        'overrides': [
+          for (final override in input.overrides)
+            {
+              'permission_code': override.permissionCode,
+              'effect': override.effect,
+            },
+        ],
+        'assigned_unit_ids': input.assignedUnitIds,
+      },
+    );
+    return AccessUserDetail.fromJson(
+      response.data ?? const <String, dynamic>{},
+    );
+  }
+
+  Future<void> deleteAccessUser(String userId) async {
+    await _dio.delete('users/$userId');
   }
 
   Future<AccessUserDetail> fetchUserAccess(String userId) async {
@@ -1421,6 +1627,65 @@ class BackendApiService {
 
   Future<void> resolveMaintenanceTicket(String ticketId) async {
     await _dio.post('maintenance/tickets/$ticketId/resolve');
+  }
+
+  Future<List<NotificationFeedItem>> fetchNotifications({int limit = 100}) async {
+    final response = await _dio.get<List<dynamic>>(
+      'notifications',
+      queryParameters: {'limit': limit.clamp(1, 200)},
+    );
+    return (response.data ?? const [])
+        .cast<Map>()
+        .map(
+          (item) => NotificationFeedItem.fromJson(item.cast<String, dynamic>()),
+        )
+        .toList();
+  }
+
+  Future<NotificationStats> fetchNotificationStats() async {
+    final response = await _dio.get<Map<String, dynamic>>('notifications/stats');
+    return NotificationStats.fromJson(response.data ?? const <String, dynamic>{});
+  }
+
+  Future<NotificationFeedItem> markNotificationRead(String notificationId) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'notifications/$notificationId/read',
+    );
+    return NotificationFeedItem.fromJson(
+      response.data ?? const <String, dynamic>{},
+    );
+  }
+
+  Future<int> markAllNotificationsRead() async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'notifications/read-all',
+    );
+    return response.data?['updated'] as int? ?? 0;
+  }
+
+  Future<List<NotificationFeedItem>> createNotificationBroadcast({
+    required String title,
+    required String body,
+  }) async {
+    final response = await _dio.post<List<dynamic>>(
+      'notifications/broadcast',
+      data: {'title': title, 'body': body},
+    );
+    return (response.data ?? const [])
+        .cast<Map>()
+        .map(
+          (item) => NotificationFeedItem.fromJson(item.cast<String, dynamic>()),
+        )
+        .toList();
+  }
+
+  Future<NotificationDeliveryConfig> fetchNotificationDeliveryConfig() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'notifications/delivery-config',
+    );
+    return NotificationDeliveryConfig.fromJson(
+      response.data ?? const <String, dynamic>{},
+    );
   }
 }
 

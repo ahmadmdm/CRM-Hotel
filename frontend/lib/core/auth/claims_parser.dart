@@ -1,7 +1,7 @@
 import 'auth_session.dart';
 
-Set<UserRole> parseRoleCodes(Iterable<String> values) {
-  return values.map(userRoleFromCode).toSet();
+Set<String> parseRoleCodes(Iterable<String> values) {
+  return _parseStringSet(values);
 }
 
 Set<String> parsePermissionCodes(Iterable<String> values) {

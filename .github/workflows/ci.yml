@@ -26,8 +26,17 @@ jobs:
           print(f"flutter-version={config['flutter']}")
           PY
 
+  validate-production-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate production compose backend builds
+        run: bash backend/deploy/verify_prod_compose_builds.sh
+
   backend:
     runs-on: ubuntu-latest
+    needs: validate-production-compose
     defaults:
       run:
         working-directory: backend
@@ -59,7 +68,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
-    needs: prepare
+    needs: [prepare, validate-production-compose]
     defaults:
       run:
         working-directory: frontend
@@ -106,7 +115,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    needs: [prepare, backend, frontend]
+    needs: [prepare, validate-production-compose, backend, frontend]
     steps:
       - uses: actions/checkout@v4
 

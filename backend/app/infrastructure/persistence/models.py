@@ -8,6 +8,7 @@ from sqlmodel import Field, SQLModel
 from app.core.enums import (
     AccessOverrideEffect,
     BookingStatus,
+    NotificationKind,
     OperationTeamType,
     PaymentStatus,
     PriorityLevel,
@@ -205,6 +206,20 @@ class MaintenanceTicket(TimestampedModel, table=True):
     status: TicketStatus = Field(default=TicketStatus.open)
     priority: PriorityLevel = Field(default=PriorityLevel.normal)
     resolved_at: datetime | None = None
+
+
+class Notification(TimestampedModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    recipient_user_id: str = Field(foreign_key="user.id", index=True)
+    actor_user_id: str | None = Field(default=None, foreign_key="user.id", index=True)
+    kind: NotificationKind = Field(index=True)
+    title: str
+    body: str
+    resource_type: str | None = None
+    resource_id: str | None = Field(default=None, index=True)
+    metadata_json: str | None = None
+    is_read: bool = Field(default=False, index=True)
+    read_at: datetime | None = None
 
 
 class Payment(TimestampedModel, table=True):

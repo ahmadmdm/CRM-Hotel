@@ -41,22 +41,21 @@ class _FinanceQuery {
   }
 
   @override
-  int get hashCode => Object.hash(
-    period,
-    anchorDate.year,
-    anchorDate.month,
-    anchorDate.day,
-  );
+  int get hashCode =>
+      Object.hash(period, anchorDate.year, anchorDate.month, anchorDate.day);
 }
 
-final financeProvider = FutureProvider.family<FinanceSnapshot, _FinanceQuery>(
-  (ref, query) async {
-    return ref.read(backendApiProvider).fetchFinance(
-          period: query.period.apiValue,
-          anchorDate: query.anchorDate,
-        );
-  },
-);
+final financeProvider = FutureProvider.family<FinanceSnapshot, _FinanceQuery>((
+  ref,
+  query,
+) async {
+  return ref
+      .read(backendApiProvider)
+      .fetchFinance(
+        period: query.period.apiValue,
+        anchorDate: query.anchorDate,
+      );
+});
 
 class FinancePage extends ConsumerStatefulWidget {
   const FinancePage({super.key});
@@ -82,9 +81,17 @@ class _FinancePageState extends ConsumerState<FinancePage> {
     setState(() {
       switch (_period) {
         case _FinancePeriodOption.month:
-          _anchorDate = DateTime(_anchorDate.year, _anchorDate.month + delta, 1);
+          _anchorDate = DateTime(
+            _anchorDate.year,
+            _anchorDate.month + delta,
+            1,
+          );
         case _FinancePeriodOption.quarter:
-          _anchorDate = DateTime(_anchorDate.year, _anchorDate.month + (delta * 3), 1);
+          _anchorDate = DateTime(
+            _anchorDate.year,
+            _anchorDate.month + (delta * 3),
+            1,
+          );
         case _FinancePeriodOption.year:
           _anchorDate = DateTime(_anchorDate.year + delta, 1, 1);
       }
@@ -92,7 +99,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _showCreatePaymentDialog() async {
@@ -131,7 +140,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
               final selectedUnit = unitsById[selectedBooking.unitId];
               return AlertDialog(
                 title: Text(
-                  l10n.isArabic ? 'تسجيل إيراد / دفعة' : 'Record revenue / payment',
+                  l10n.isArabic
+                      ? 'تسجيل إيراد / دفعة'
+                      : 'Record revenue / payment',
                 ),
                 content: SizedBox(
                   width: 460,
@@ -161,7 +172,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                                   if (value == null) {
                                     return;
                                   }
-                                  setDialogState(() => selectedBookingId = value);
+                                  setDialogState(
+                                    () => selectedBookingId = value,
+                                  );
                                 },
                         ),
                         const SizedBox(height: 12),
@@ -175,7 +188,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                         TextField(
                           controller: amountController,
                           enabled: !isSaving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: InputDecoration(
                             labelText: l10n.isArabic ? 'المبلغ' : 'Amount',
                           ),
@@ -184,11 +199,19 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                         DropdownButtonFormField<String>(
                           initialValue: method,
                           decoration: InputDecoration(
-                            labelText: l10n.isArabic ? 'طريقة الدفع' : 'Payment method',
+                            labelText: l10n.isArabic
+                                ? 'طريقة الدفع'
+                                : 'Payment method',
                           ),
                           items: const [
-                            DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                            DropdownMenuItem(value: 'card', child: Text('Card')),
+                            DropdownMenuItem(
+                              value: 'cash',
+                              child: Text('Cash'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'card',
+                              child: Text('Card'),
+                            ),
                             DropdownMenuItem(
                               value: 'bank_transfer',
                               child: Text('Bank transfer'),
@@ -208,7 +231,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                           controller: referenceController,
                           enabled: !isSaving,
                           decoration: InputDecoration(
-                            labelText: l10n.isArabic ? 'مرجع العملية' : 'Reference',
+                            labelText: l10n.isArabic
+                                ? 'مرجع العملية'
+                                : 'Reference',
                           ),
                         ),
                       ],
@@ -217,14 +242,18 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                 ),
                 actions: [
                   TextButton(
-                    onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(false),
+                    onPressed: isSaving
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(false),
                     child: Text(l10n.isArabic ? 'إلغاء' : 'Cancel'),
                   ),
                   FilledButton(
                     onPressed: isSaving
                         ? null
                         : () async {
-                            final amount = double.tryParse(amountController.text.trim());
+                            final amount = double.tryParse(
+                              amountController.text.trim(),
+                            );
                             if (amount == null || amount <= 0) {
                               _showMessage(
                                 l10n.isArabic
@@ -239,7 +268,8 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                                 bookingId: selectedBookingId,
                                 amount: amount,
                                 method: method,
-                                referenceNo: referenceController.text.trim().isEmpty
+                                referenceNo:
+                                    referenceController.text.trim().isEmpty
                                     ? null
                                     : referenceController.text.trim(),
                               );
@@ -305,7 +335,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
             builder: (dialogContext, setDialogState) {
               return AlertDialog(
                 title: Text(
-                  l10n.isArabic ? 'تسجيل مصروف تشغيلي' : 'Record operating expense',
+                  l10n.isArabic
+                      ? 'تسجيل مصروف تشغيلي'
+                      : 'Record operating expense',
                 ),
                 content: SizedBox(
                   width: 460,
@@ -354,7 +386,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                         TextField(
                           controller: amountController,
                           enabled: !isSaving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: InputDecoration(
                             labelText: l10n.isArabic ? 'المبلغ' : 'Amount',
                           ),
@@ -365,14 +399,18 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                 ),
                 actions: [
                   TextButton(
-                    onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(false),
+                    onPressed: isSaving
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(false),
                     child: Text(l10n.isArabic ? 'إلغاء' : 'Cancel'),
                   ),
                   FilledButton(
                     onPressed: isSaving
                         ? null
                         : () async {
-                            final amount = double.tryParse(amountController.text.trim());
+                            final amount = double.tryParse(
+                              amountController.text.trim(),
+                            );
                             if (amount == null || amount <= 0) {
                               _showMessage(
                                 l10n.isArabic
@@ -384,7 +422,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                             final category = categoryController.text.trim();
                             if (category.isEmpty) {
                               _showMessage(
-                                l10n.isArabic ? 'أدخل فئة المصروف.' : 'Enter an expense category.',
+                                l10n.isArabic
+                                    ? 'أدخل فئة المصروف.'
+                                    : 'Enter an expense category.',
                               );
                               return;
                             }
@@ -394,7 +434,8 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                                 unitId: selectedUnitId,
                                 category: category,
                                 amount: amount,
-                                description: descriptionController.text.trim().isEmpty
+                                description:
+                                    descriptionController.text.trim().isEmpty
                                     ? null
                                     : descriptionController.text.trim(),
                               );
@@ -464,7 +505,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
             builder: (dialogContext, setDialogState) {
               return AlertDialog(
                 title: Text(
-                  l10n.isArabic ? 'تسجيل أصل رأسمالي' : 'Register capital asset',
+                  l10n.isArabic
+                      ? 'تسجيل أصل رأسمالي'
+                      : 'Register capital asset',
                 ),
                 content: SizedBox(
                   width: 460,
@@ -498,7 +541,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                           controller: nameController,
                           enabled: !isSaving,
                           decoration: InputDecoration(
-                            labelText: l10n.isArabic ? 'اسم الأصل' : 'Asset name',
+                            labelText: l10n.isArabic
+                                ? 'اسم الأصل'
+                                : 'Asset name',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -513,18 +558,26 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                         TextField(
                           controller: acquisitionController,
                           enabled: !isSaving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: InputDecoration(
-                            labelText: l10n.isArabic ? 'قيمة الشراء' : 'Acquisition cost',
+                            labelText: l10n.isArabic
+                                ? 'قيمة الشراء'
+                                : 'Acquisition cost',
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: residualController,
                           enabled: !isSaving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: InputDecoration(
-                            labelText: l10n.isArabic ? 'القيمة المتبقية' : 'Residual value',
+                            labelText: l10n.isArabic
+                                ? 'القيمة المتبقية'
+                                : 'Residual value',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -533,7 +586,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                           enabled: !isSaving,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: l10n.isArabic ? 'العمر بالأشهر' : 'Useful life in months',
+                            labelText: l10n.isArabic
+                                ? 'العمر بالأشهر'
+                                : 'Useful life in months',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -550,7 +605,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                 ),
                 actions: [
                   TextButton(
-                    onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(false),
+                    onPressed: isSaving
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(false),
                     child: Text(l10n.isArabic ? 'إلغاء' : 'Cancel'),
                   ),
                   FilledButton(
@@ -561,8 +618,13 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                               acquisitionController.text.trim(),
                             );
                             final residual =
-                                double.tryParse(residualController.text.trim()) ?? 0;
-                            final usefulLife = int.tryParse(lifeController.text.trim());
+                                double.tryParse(
+                                  residualController.text.trim(),
+                                ) ??
+                                0;
+                            final usefulLife = int.tryParse(
+                              lifeController.text.trim(),
+                            );
                             if (nameController.text.trim().isEmpty ||
                                 categoryController.text.trim().isEmpty ||
                                 acquisition == null ||
@@ -635,7 +697,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stackTrace) => Center(
         child: AppErrorView(
-          title: l10n.isArabic ? 'تعذر تحميل المالية' : 'Unable to load finance',
+          title: l10n.isArabic
+              ? 'تعذر تحميل المالية'
+              : 'Unable to load finance',
           subtitle: '$error',
           onRetry: _refreshFinance,
         ),
@@ -662,7 +726,11 @@ class _FinancePageState extends ConsumerState<FinancePage> {
           (sum, item) => sum + item.profitLoss,
         );
         final screenWidth = MediaQuery.sizeOf(context).width;
-        final crossAxisCount = screenWidth >= 1440 ? 5 : screenWidth >= 960 ? 3 : 1;
+        final crossAxisCount = screenWidth >= 1440
+            ? 5
+            : screenWidth >= 960
+            ? 3
+            : 1;
         return ListView(
           padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
           children: [
@@ -680,7 +748,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.isArabic ? 'لوحة التدفق المالي' : 'Financial flow deck',
+                    l10n.isArabic
+                        ? 'لوحة التدفق المالي'
+                        : 'Financial flow deck',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -689,8 +759,8 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                   const SizedBox(height: 8),
                   Text(
                     l10n.isArabic
-                        ? 'حوّل المالية إلى مركز قيادة تشغيلي يوضح دخل كل وحدة، مصروفها، إهلاكها، وصافي ربحها أو خسارتها.'
-                        : 'Turn finance into an operating command view that shows each unit revenue, expense load, depreciation, and profit or loss.',
+                        ? 'راجع الإيراد والمصروف والإهلاك وصافي النتيجة لكل وحدة خلال الفترة المحددة.'
+                        : 'Review revenue, expenses, depreciation, and net result for each unit in the selected period.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.82),
                     ),
@@ -713,7 +783,10 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                           },
                         ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
@@ -729,10 +802,11 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                             ),
                             Text(
                               _periodLabel(context, _period, _anchorDate),
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                             ),
                             IconButton(
                               visualDensity: VisualDensity.compact,
@@ -756,10 +830,14 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                       OutlinedButton.icon(
                         onPressed: _showCreateAssetDialog,
                         icon: const Icon(Icons.inventory_2_outlined),
-                        label: Text(l10n.isArabic ? 'أصل رأسمالي' : 'Capital asset'),
+                        label: Text(
+                          l10n.isArabic ? 'أصل رأسمالي' : 'Capital asset',
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                          side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.45),
+                          ),
                         ),
                       ),
                     ],
@@ -777,17 +855,23 @@ class _FinancePageState extends ConsumerState<FinancePage> {
               childAspectRatio: 1.6,
               children: [
                 KpiCard(
-                  label: l10n.isArabic ? 'الإيراد المحقق' : 'Recognized revenue',
+                  label: l10n.isArabic
+                      ? 'الإيراد المحقق'
+                      : 'Recognized revenue',
                   value: l10n.formatCurrency(totalPayments),
                   accentColor: AppColors.pine,
                 ),
                 KpiCard(
-                  label: l10n.isArabic ? 'المصروفات المباشرة' : 'Direct expenses',
+                  label: l10n.isArabic
+                      ? 'المصروفات المباشرة'
+                      : 'Direct expenses',
                   value: l10n.formatCurrency(totalExpenses),
                   accentColor: AppColors.amber,
                 ),
                 KpiCard(
-                  label: l10n.isArabic ? 'الإنفاق الرأسمالي' : 'Capital expenditure',
+                  label: l10n.isArabic
+                      ? 'الإنفاق الرأسمالي'
+                      : 'Capital expenditure',
                   value: l10n.formatCurrency(totalCapitalExpenditure),
                   accentColor: AppColors.sky,
                 ),
@@ -799,7 +883,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                 KpiCard(
                   label: l10n.isArabic ? 'صافي المحفظة' : 'Portfolio net',
                   value: l10n.formatCurrency(totalProfitLoss),
-                  accentColor: totalProfitLoss >= 0 ? AppColors.sky : AppColors.rose,
+                  accentColor: totalProfitLoss >= 0
+                      ? AppColors.sky
+                      : AppColors.rose,
                 ),
               ],
             ),
@@ -809,7 +895,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                 children: [
                   ListTile(
                     title: Text(
-                      l10n.isArabic ? 'مراكز التكلفة حسب الوحدة' : 'Unit cost centers',
+                      l10n.isArabic
+                          ? 'مراكز التكلفة حسب الوحدة'
+                          : 'Unit cost centers',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     subtitle: Text(
@@ -833,7 +921,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                         children: [
                           ListTile(
                             title: Text(
-                              l10n.isArabic ? 'سجل الأصول الرأسمالية' : 'Capital asset register',
+                              l10n.isArabic
+                                  ? 'سجل الأصول الرأسمالية'
+                                  : 'Capital asset register',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             subtitle: Text(
@@ -854,7 +944,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                           else
                             for (final asset in snapshot.assets)
                               ListTile(
-                                title: Text('${asset.unitCode} · ${asset.name}'),
+                                title: Text(
+                                  '${asset.unitCode} · ${asset.name}',
+                                ),
                                 subtitle: Text(
                                   [
                                     asset.category,
@@ -878,7 +970,9 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                                       l10n.isArabic
                                           ? 'إهلاك ${l10n.formatCurrency(asset.periodDepreciation)}'
                                           : 'Dep ${l10n.formatCurrency(asset.periodDepreciation)}',
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
@@ -886,18 +980,18 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        children: [
-                          for (final center in snapshot.costCenters)
-                            _CostCenterCard(center: center),
-                        ],
-                      ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        for (final center in snapshot.costCenters)
+                          _CostCenterCard(center: center),
+                      ],
                     ),
+                  ),
                 ],
               ),
             ),
@@ -920,8 +1014,10 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                       ),
                       subtitle: Text(
                         [
-                          if (payment.unitCode != null && payment.unitCode!.isNotEmpty)
-                            '${payment.unitCode} · ${payment.unitName ?? ''}'.trim(),
+                          if (payment.unitCode != null &&
+                              payment.unitCode!.isNotEmpty)
+                            '${payment.unitCode} · ${payment.unitName ?? ''}'
+                                .trim(),
                           l10n.paymentStatus(payment.status),
                           _formatDate(context, payment.createdAt),
                         ].where((item) => item.isNotEmpty).join(' • '),
@@ -955,8 +1051,10 @@ class _FinancePageState extends ConsumerState<FinancePage> {
                       ),
                       subtitle: Text(
                         [
-                          if (expense.unitCode != null && expense.unitCode!.isNotEmpty)
-                            '${expense.unitCode} · ${expense.unitName ?? ''}'.trim(),
+                          if (expense.unitCode != null &&
+                              expense.unitCode!.isNotEmpty)
+                            '${expense.unitCode} · ${expense.unitName ?? ''}'
+                                .trim(),
                           expense.description,
                           _formatDate(context, expense.createdAt),
                         ].where((item) => item.isNotEmpty).join(' • '),
@@ -1134,7 +1232,9 @@ String _periodLabel(
       return '${anchorDate.month.toString().padLeft(2, '0')}/${anchorDate.year}';
     case _FinancePeriodOption.quarter:
       final quarter = ((anchorDate.month - 1) ~/ 3) + 1;
-      return l10n.isArabic ? 'الربع $quarter · ${anchorDate.year}' : 'Q$quarter · ${anchorDate.year}';
+      return l10n.isArabic
+          ? 'الربع $quarter · ${anchorDate.year}'
+          : 'Q$quarter · ${anchorDate.year}';
     case _FinancePeriodOption.year:
       return '${anchorDate.year}';
   }
@@ -1147,7 +1247,9 @@ String _formatDate(BuildContext context, DateTime date) {
 String _financeActionError(Object error, AppLocalizations l10n) {
   final message = error.toString();
   if (message.isEmpty) {
-    return l10n.isArabic ? 'تعذر تنفيذ العملية المالية.' : 'Unable to complete the finance action.';
+    return l10n.isArabic
+        ? 'تعذر تنفيذ العملية المالية.'
+        : 'Unable to complete the finance action.';
   }
   return message;
 }

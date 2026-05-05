@@ -13,7 +13,7 @@ class SessionController extends AsyncNotifier<AuthSession?> {
       return null;
     }
     try {
-      final hydratedSession = await ref.read(authApiProvider).me(storedSession);
+      final hydratedSession = await ref.read(authApiProvider).refresh(storedSession);
       await ref.read(tokenStoreProvider).writeSession(hydratedSession);
       return hydratedSession;
     } catch (_) {
@@ -24,11 +24,15 @@ class SessionController extends AsyncNotifier<AuthSession?> {
 
   Future<void> signIn(String email, String password) async {
     state = const AsyncLoading();
-    final session = await ref
-        .read(authApiProvider)
-        .login(email: email, password: password);
-    await ref.read(tokenStoreProvider).writeSession(session);
-    state = AsyncData(session);
+    try {
+      final session = await ref
+          .read(authApiProvider)
+          .login(email: email, password: password);
+      await ref.read(tokenStoreProvider).writeSession(session);
+      state = AsyncData(session);
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 
   Future<void> refreshSession() async {
@@ -36,7 +40,7 @@ class SessionController extends AsyncNotifier<AuthSession?> {
     if (currentSession == null) {
       return;
     }
-    final hydratedSession = await ref.read(authApiProvider).me(currentSession);
+    final hydratedSession = await ref.read(authApiProvider).refresh(currentSession);
     await ref.read(tokenStoreProvider).writeSession(hydratedSession);
     state = AsyncData(hydratedSession);
   }
@@ -47,6 +51,12 @@ class SessionController extends AsyncNotifier<AuthSession?> {
   }
 
   Future<void> signOut() async {
+    final currentSession = state.valueOrNull;
+    if (currentSession != null) {
+      try {
+        await ref.read(authApiProvider).logout(currentSession);
+      } catch (_) {}
+    }
     await ref.read(tokenStoreProvider).clear();
     state = const AsyncData(null);
   }

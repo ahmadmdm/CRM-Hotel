@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
@@ -9,7 +11,10 @@ from sqlmodel import Session, select
 from app.api.dependencies.auth import CurrentUser, require_permissions
 from app.core.access_control import (
     PERMISSION_CATALOG,
+    SUB_ADMIN_MANAGEABLE_PERMISSION_CODES,
+    SYSTEM_ROLE_CODES,
     get_access_profile_for_user,
+    get_role_permission_codes_map,
     get_role_codes_for_user,
 )
 from app.core.db import get_session
@@ -21,8 +26,12 @@ from app.infrastructure.persistence.models import (
     OperationTeam,
     OperationTeamMember,
     OperationTeamUnitAssignment,
+    Permission,
+    Role,
+    RolePermission,
     Unit,
     User,
+    UserRole,
 )
 from app.schemas.access import (
     AssignedUnitRead,
@@ -30,6 +39,8 @@ from app.schemas.access import (
     OperationTeamMemberRead,
     OperationTeamRead,
     OperationTeamUpsert,
+    PermissionGroupRead,
+    PermissionGroupUpsert,
     PermissionRead,
 )
 
@@ -50,6 +61,91 @@ TEAM_OVERDUE_WINDOWS = {
 
 def _normalized_team_name(name: str) -> str:
     return " ".join(name.split())
+
+
+def _normalized_permission_group_name(name: str) -> str:
+    return " ".join(name.split())
+
+
+def _build_permission_group_code() -> str:
+    return f"custom_{uuid4().hex[:12]}"
+
+
+def _serialize_permission_group(
+    role: Role,
+    *,
+    permission_codes: list[str],
+    member_count: int,
+) -> PermissionGroupRead:
+    return PermissionGroupRead(
+        code=role.code,
+        name=role.name,
+        permission_codes=permission_codes,
+        is_system=role.code in SYSTEM_ROLE_CODES,
+        member_count=member_count,
+    )
+
+
+def _validate_permission_group_payload(
+    session: Session,
+    *,
+    payload: PermissionGroupUpsert,
+    current_role_id: str | None = None,
+) -> tuple[str, list[Permission]]:
+    normalized_name = _normalized_permission_group_name(payload.name)
+    if not normalized_name:
+        raise DomainError(
+            code="PERMISSION_GROUP_NAME_REQUIRED",
+            message="Permission groups require a name.",
+            status_code=422,
+        )
+
+    permission_codes = list(dict.fromkeys(payload.permission_codes))
+    if not permission_codes:
+        raise DomainError(
+            code="PERMISSION_GROUP_PERMISSIONS_REQUIRED",
+            message="Permission groups require at least one permission.",
+            status_code=422,
+        )
+
+    existing_role = session.exec(select(Role).where(Role.name == normalized_name)).first()
+    if existing_role is not None and existing_role.id != current_role_id:
+        raise DomainError(
+            code="PERMISSION_GROUP_NAME_ALREADY_EXISTS",
+            message="A permission group with this name already exists.",
+            status_code=409,
+        )
+
+    permissions = session.exec(
+        select(Permission).where(Permission.code.in_(permission_codes)).order_by(Permission.code)
+    ).all()
+    permission_map = {permission.code: permission for permission in permissions}
+    missing_permission_codes = sorted(set(permission_codes) - set(permission_map))
+    if missing_permission_codes:
+        raise DomainError(
+            code="PERMISSION_CODES_NOT_FOUND",
+            message="One or more permission codes do not exist.",
+            details={"missing_permissions": ",".join(missing_permission_codes)},
+            status_code=404,
+        )
+
+    return normalized_name, [permission_map[code] for code in sorted(permission_codes)]
+
+
+def _enforce_permission_group_scope(
+    *,
+    actor: CurrentUser,
+    permission_codes: list[str],
+) -> None:
+    if "super_admin" in actor.roles:
+        return
+
+    if not set(permission_codes).issubset(SUB_ADMIN_MANAGEABLE_PERMISSION_CODES):
+        raise DomainError(
+            code="PERMISSION_GROUP_FORBIDDEN",
+            message="Sub-admin users can create and edit only operational permission groups.",
+            status_code=403,
+        )
 
 
 def _is_work_item_overdue(*, created_at: datetime, priority: PriorityLevel, now: datetime) -> bool:
@@ -307,7 +403,10 @@ def _validate_team_payload(
 
 @router.get("/permissions-catalog", response_model=list[PermissionRead])
 def list_permissions_catalog(
-    _: Annotated[CurrentUser, Depends(require_permissions("users.view"))],
+    _: Annotated[
+        CurrentUser,
+        Depends(require_permissions("users.view", "users.manage_access")),
+    ],
 ) -> list[PermissionRead]:
     return [
         PermissionRead(
@@ -320,9 +419,160 @@ def list_permissions_catalog(
     ]
 
 
+@router.get("/permission-groups", response_model=list[PermissionGroupRead])
+def list_permission_groups(
+    _: Annotated[
+        CurrentUser,
+        Depends(require_permissions("users.view", "users.manage_access")),
+    ],
+    session: Annotated[Session, Depends(get_session)],
+) -> list[PermissionGroupRead]:
+    roles = session.exec(select(Role)).all()
+    role_permission_map = get_role_permission_codes_map(
+        session,
+        [role.code for role in roles],
+    )
+    member_count_by_role_id = Counter(session.exec(select(UserRole.role_id)).all())
+    sorted_roles = sorted(
+        roles,
+        key=lambda role: (role.code not in SYSTEM_ROLE_CODES, role.name.lower(), role.code),
+    )
+    return [
+        _serialize_permission_group(
+            role,
+            permission_codes=role_permission_map.get(role.code, []),
+            member_count=member_count_by_role_id.get(role.id, 0),
+        )
+        for role in sorted_roles
+    ]
+
+
+@router.post("/permission-groups", response_model=PermissionGroupRead)
+def create_permission_group(
+    payload: PermissionGroupUpsert,
+    actor: Annotated[CurrentUser, Depends(require_permissions("users.manage_access"))],
+    session: Annotated[Session, Depends(get_session)],
+) -> PermissionGroupRead:
+    normalized_name, permissions = _validate_permission_group_payload(session, payload=payload)
+    permission_codes = [permission.code for permission in permissions]
+    _enforce_permission_group_scope(actor=actor, permission_codes=permission_codes)
+
+    role = Role(code=_build_permission_group_code(), name=normalized_name)
+    session.add(role)
+    session.flush()
+    for permission in permissions:
+        session.add(RolePermission(role_id=role.id, permission_id=permission.id))
+    session.commit()
+    session.refresh(role)
+    return _serialize_permission_group(
+        role,
+        permission_codes=sorted(permission_codes),
+        member_count=0,
+    )
+
+
+@router.patch("/permission-groups/{role_code}", response_model=PermissionGroupRead)
+def update_permission_group(
+    role_code: str,
+    payload: PermissionGroupUpsert,
+    actor: Annotated[CurrentUser, Depends(require_permissions("users.manage_access"))],
+    session: Annotated[Session, Depends(get_session)],
+) -> PermissionGroupRead:
+    role = session.exec(select(Role).where(Role.code == role_code)).first()
+    if role is None:
+        raise DomainError(
+            code="PERMISSION_GROUP_NOT_FOUND",
+            message="Permission group not found.",
+            status_code=404,
+        )
+    if role.code in SYSTEM_ROLE_CODES:
+        raise DomainError(
+            code="SYSTEM_PERMISSION_GROUP_IMMUTABLE",
+            message="System permission groups cannot be edited.",
+            status_code=403,
+        )
+
+    normalized_name, permissions = _validate_permission_group_payload(
+        session,
+        payload=payload,
+        current_role_id=role.id,
+    )
+    permission_codes = [permission.code for permission in permissions]
+    _enforce_permission_group_scope(actor=actor, permission_codes=permission_codes)
+
+    role.name = normalized_name
+    session.add(role)
+    session.flush()
+    existing_links = session.exec(
+        select(RolePermission).where(RolePermission.role_id == role.id)
+    ).all()
+    for link in existing_links:
+        session.delete(link)
+    session.flush()
+    for permission in permissions:
+        session.add(RolePermission(role_id=role.id, permission_id=permission.id))
+    session.commit()
+    session.refresh(role)
+    member_count = session.exec(
+        select(UserRole).where(UserRole.role_id == role.id)
+    ).all()
+    return _serialize_permission_group(
+        role,
+        permission_codes=sorted(permission_codes),
+        member_count=len(member_count),
+    )
+
+
+@router.delete("/permission-groups/{role_code}")
+def delete_permission_group(
+    role_code: str,
+    actor: Annotated[CurrentUser, Depends(require_permissions("users.manage_access"))],
+    session: Annotated[Session, Depends(get_session)],
+) -> dict[str, bool]:
+    role = session.exec(select(Role).where(Role.code == role_code)).first()
+    if role is None:
+        raise DomainError(
+            code="PERMISSION_GROUP_NOT_FOUND",
+            message="Permission group not found.",
+            status_code=404,
+        )
+    if role.code in SYSTEM_ROLE_CODES:
+        raise DomainError(
+            code="SYSTEM_PERMISSION_GROUP_IMMUTABLE",
+            message="System permission groups cannot be deleted.",
+            status_code=403,
+        )
+
+    permission_codes = get_role_permission_codes_map(session, [role.code]).get(role.code, [])
+    _enforce_permission_group_scope(actor=actor, permission_codes=permission_codes)
+
+    existing_member_links = session.exec(
+        select(UserRole).where(UserRole.role_id == role.id)
+    ).all()
+    if existing_member_links:
+        raise DomainError(
+            code="PERMISSION_GROUP_IN_USE",
+            message="Permission groups assigned to users cannot be deleted.",
+            status_code=409,
+        )
+
+    existing_permission_links = session.exec(
+        select(RolePermission).where(RolePermission.role_id == role.id)
+    ).all()
+    for link in existing_permission_links:
+        session.delete(link)
+    session.flush()
+    session.delete(role)
+    session.commit()
+    return {"ok": True}
+
+
 @router.get("/operation-teams", response_model=list[OperationTeamRead])
 def list_operation_teams(
-    _: Annotated[CurrentUser, Depends(require_permissions("users.view"))],
+    _: Annotated[
+        CurrentUser,
+        Depends(require_permissions("users.view", "users.manage_access")),
+    ],
     session: Annotated[Session, Depends(get_session)],
 ) -> list[OperationTeamRead]:
     teams = session.exec(

@@ -24,14 +24,17 @@ def _run_migrations() -> None:
 
 def create_db_and_tables(seed: bool = True) -> None:
     from app.infrastructure.persistence import models  # noqa: F401
+    from app.core.seed import ensure_access_control_baseline
 
     _run_migrations()
     SQLModel.metadata.create_all(engine)
-    if seed:
-        from app.core.seed import seed_database
+    with Session(engine) as session:
+        ensure_access_control_baseline(session)
+        if seed:
+            from app.core.seed import seed_database
 
-        with Session(engine) as session:
             seed_database(session)
+
 
 
 def get_session() -> Generator[Session, None, None]:

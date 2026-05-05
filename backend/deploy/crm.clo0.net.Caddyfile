@@ -1,0 +1,11 @@
+crm.clo0.net {
+    encode zstd gzip
+
+    @api path /api/*
+    reverse_proxy @api 127.0.0.1:3811
+
+    @media path /media/*
+    reverse_proxy @media 127.0.0.1:3812
+
+    reverse_proxy 127.0.0.1:3810
+}

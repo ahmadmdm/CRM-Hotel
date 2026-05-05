@@ -73,17 +73,17 @@ class AuthSession {
   final String email;
   final String accessToken;
   final String refreshToken;
-  final Set<UserRole> roles;
+  final Set<String> roles;
   final Set<String> permissions;
   final Set<String> assignedUnitIds;
 
   bool get hasAssignedUnits => assignedUnitIds.isNotEmpty;
 
-  bool hasRole(UserRole role) => roles.contains(role);
+  bool hasRole(UserRole role) => roles.contains(role.code);
 
   bool hasAnyRole(Set<UserRole> allowedRoles) {
-    for (final role in roles) {
-      if (allowedRoles.contains(role)) {
+    for (final role in allowedRoles) {
+      if (roles.contains(role.code)) {
         return true;
       }
     }
@@ -109,36 +109,64 @@ class AuthSession {
     if (hasPermission(AppPermission.reportsView)) {
       return RouteNames.reports;
     }
-    if (hasPermission(AppPermission.financeView)) {
+    if (hasAnyPermission({
+      AppPermission.financeView,
+      AppPermission.financeManage,
+    })) {
       return RouteNames.finance;
     }
-    if (hasPermission(AppPermission.bookingsView)) {
+    if (hasAnyPermission({
+      AppPermission.bookingsView,
+      AppPermission.bookingsManage,
+    })) {
       return RouteNames.bookings;
     }
-    if (hasPermission(AppPermission.unitsView)) {
+    if (hasAnyPermission({
+      AppPermission.unitsView,
+      AppPermission.unitsManage,
+    })) {
       return RouteNames.units;
     }
-    if (hasPermission(AppPermission.crmView)) {
+    if (hasAnyPermission({
+      AppPermission.crmView,
+      AppPermission.crmManage,
+    })) {
       return RouteNames.crm;
     }
-    if (hasPermission(AppPermission.usersView)) {
+    if (hasAnyPermission({
+      AppPermission.usersView,
+      AppPermission.usersManageAccess,
+    })) {
       return RouteNames.access;
     }
-    if (hasPermission(AppPermission.maintenanceView)) {
+    if (hasAnyPermission({
+      AppPermission.maintenanceView,
+      AppPermission.maintenanceManage,
+    })) {
       return RouteNames.maintenance;
     }
-    if (hasPermission(AppPermission.housekeepingView)) {
+    if (hasAnyPermission({
+      AppPermission.housekeepingView,
+      AppPermission.housekeepingComplete,
+      AppPermission.housekeepingManage,
+    })) {
       return RouteNames.housekeeping;
+    }
+    if (hasAnyPermission({
+      AppPermission.notificationsView,
+      AppPermission.notificationsManage,
+    })) {
+      return RouteNames.notifications;
     }
     return RouteNames.forbidden;
   }
 }
 
-Set<String> defaultPermissionCodesForRoles(Set<UserRole> roles) {
+Set<String> defaultPermissionCodesForRoles(Iterable<String> roleCodes) {
   final permissions = <String>{};
-  for (final role in roles) {
-    switch (role) {
-      case UserRole.superAdmin:
+  for (final roleCode in roleCodes) {
+    switch (roleCode) {
+      case 'super_admin':
         permissions.addAll(const {
           AppPermission.dashboardView,
           AppPermission.unitsView,
@@ -157,9 +185,11 @@ Set<String> defaultPermissionCodesForRoles(Set<UserRole> roles) {
           AppPermission.reportsView,
           AppPermission.usersView,
           AppPermission.usersManageAccess,
+          AppPermission.notificationsView,
+          AppPermission.notificationsManage,
         });
         break;
-      case UserRole.subAdmin:
+      case 'sub_admin':
         permissions.addAll(const {
           AppPermission.dashboardView,
           AppPermission.unitsView,
@@ -176,9 +206,11 @@ Set<String> defaultPermissionCodesForRoles(Set<UserRole> roles) {
           AppPermission.reportsView,
           AppPermission.usersView,
           AppPermission.usersManageAccess,
+          AppPermission.notificationsView,
+          AppPermission.notificationsManage,
         });
         break;
-      case UserRole.financial:
+      case 'financial':
         permissions.addAll(const {
           AppPermission.dashboardView,
           AppPermission.unitsView,
@@ -187,9 +219,10 @@ Set<String> defaultPermissionCodesForRoles(Set<UserRole> roles) {
           AppPermission.financeView,
           AppPermission.financeManage,
           AppPermission.reportsView,
+          AppPermission.notificationsView,
         });
         break;
-      case UserRole.operations:
+      case 'operations':
         permissions.addAll(const {
           AppPermission.dashboardView,
           AppPermission.unitsView,
@@ -198,18 +231,21 @@ Set<String> defaultPermissionCodesForRoles(Set<UserRole> roles) {
           AppPermission.crmView,
           AppPermission.crmManage,
           AppPermission.reportsView,
+          AppPermission.notificationsView,
         });
         break;
-      case UserRole.maintenance:
+      case 'maintenance':
         permissions.addAll(const {
           AppPermission.maintenanceView,
           AppPermission.maintenanceManage,
+          AppPermission.notificationsView,
         });
         break;
-      case UserRole.housekeeping:
+      case 'housekeeping':
         permissions.addAll(const {
           AppPermission.housekeepingView,
           AppPermission.housekeepingComplete,
+          AppPermission.notificationsView,
         });
         break;
     }

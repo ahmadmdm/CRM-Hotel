@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .[dev
 
 COPY . .
 
-CMD ["celery", "-A", "app.infrastructure.queue.celery_app.celery_app", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "app.infrastructure.queue.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]

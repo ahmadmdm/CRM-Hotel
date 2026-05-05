@@ -16,6 +16,8 @@ abstract final class AppPermission {
   static const reportsView = 'reports.view';
   static const usersView = 'users.view';
   static const usersManageAccess = 'users.manage_access';
+  static const notificationsView = 'notifications.view';
+  static const notificationsManage = 'notifications.manage';
 }
 
 const subAdminAssignableRoleCodes = <String>{
@@ -40,4 +42,6 @@ const subAdminManageablePermissionCodes = <String>{
   AppPermission.housekeepingManage,
   AppPermission.maintenanceView,
   AppPermission.maintenanceManage,
+  AppPermission.notificationsView,
+  AppPermission.notificationsManage,
 };

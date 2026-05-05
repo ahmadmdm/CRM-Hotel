@@ -17,7 +17,10 @@ router = APIRouter()
 
 @router.get("", response_model=PaginatedResponse[ClientRead])
 def list_clients(
-    _: Annotated[CurrentUser, Depends(require_permissions("crm.view"))],
+    _: Annotated[
+        CurrentUser,
+        Depends(require_permissions("crm.view", "crm.manage")),
+    ],
     pagination: Annotated[PaginationParams, Depends(pagination_params)],
     session: Annotated[Session, Depends(get_session)],
     q: Annotated[str | None, Query()] = None,
@@ -53,7 +56,10 @@ def create_client(
 @router.get("/{client_id}", response_model=ClientRead)
 def get_client(
     client_id: str,
-    _: Annotated[CurrentUser, Depends(require_permissions("crm.view"))],
+    _: Annotated[
+        CurrentUser,
+        Depends(require_permissions("crm.view", "crm.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
 ) -> ClientRead:
     client = session.get(Client, client_id)

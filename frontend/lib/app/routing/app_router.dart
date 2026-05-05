@@ -12,6 +12,7 @@ import '../../features/bookings/presentation/pages/bookings_page.dart';
 import '../../features/crm/presentation/pages/crm_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/finance/presentation/pages/finance_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/operations/housekeeping/presentation/pages/housekeeping_page.dart';
 import '../../features/operations/maintenance/presentation/pages/maintenance_page.dart';
 import '../../features/reports/presentation/pages/reports_page.dart';
@@ -96,6 +97,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: RouteNames.finance,
             builder: (context, state) => const FinancePage(),
+          ),
+          GoRoute(
+            path: RouteNames.notifications,
+            builder: (context, state) => const NotificationsPage(),
           ),
         ],
       ),

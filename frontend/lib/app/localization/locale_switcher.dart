@@ -5,7 +5,9 @@ import 'app_localizations.dart';
 import 'locale_controller.dart';
 
 class LocaleMenuButton extends ConsumerWidget {
-  const LocaleMenuButton({super.key});
+  const LocaleMenuButton({super.key, this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -14,7 +16,8 @@ class LocaleMenuButton extends ConsumerWidget {
 
     return PopupMenuButton<Locale>(
       tooltip: l10n.language,
-      onSelected: (value) => ref.read(localeControllerProvider.notifier).state = value,
+      onSelected: (value) =>
+          ref.read(localeControllerProvider.notifier).state = value,
       itemBuilder: (context) => [
         PopupMenuItem<Locale>(
           value: const Locale('ar'),
@@ -25,10 +28,15 @@ class LocaleMenuButton extends ConsumerWidget {
           child: Text(l10n.english),
         ),
       ],
-      child: Chip(
-        avatar: const Icon(Icons.translate, size: 18),
-        label: Text(locale.languageCode.toUpperCase()),
-      ),
+      child: compact
+          ? const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(Icons.translate),
+            )
+          : Chip(
+              avatar: const Icon(Icons.translate, size: 18),
+              label: Text(locale.languageCode.toUpperCase()),
+            ),
     );
   }
 }

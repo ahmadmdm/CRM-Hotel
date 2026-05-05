@@ -7,6 +7,7 @@ import '../../core/auth/permissions.dart';
 import '../../core/auth/session_controller.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/offline_banner.dart';
+import '../../core/widgets/session_action_menu.dart';
 import '../routing/route_names.dart';
 
 class AppShell extends ConsumerWidget {
@@ -23,6 +24,7 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final session = ref.watch(sessionControllerProvider).valueOrNull;
+    final isCompact = MediaQuery.sizeOf(context).width < 720;
     if (session == null) {
       return Scaffold(body: child);
     }
@@ -40,57 +42,92 @@ class AppShell extends ConsumerWidget {
           icon: Icons.insights_outlined,
           route: RouteNames.reports,
         ),
-      if (session.hasPermission(AppPermission.usersView))
+      if (session.hasAnyPermission({
+        AppPermission.usersView,
+        AppPermission.usersManageAccess,
+      }))
         AppNavigationItem(
           label: l10n.accessNav,
           icon: Icons.admin_panel_settings_outlined,
           route: RouteNames.access,
         ),
-      if (session.hasPermission(AppPermission.unitsView))
+      if (session.hasAnyPermission({
+        AppPermission.unitsView,
+        AppPermission.unitsManage,
+      }))
         AppNavigationItem(
           label: l10n.unitsNav,
           icon: Icons.apartment_outlined,
           route: RouteNames.units,
         ),
-      if (session.hasPermission(AppPermission.bookingsView))
+      if (session.hasAnyPermission({
+        AppPermission.bookingsView,
+        AppPermission.bookingsManage,
+      }))
         AppNavigationItem(
           label: l10n.bookingsNav,
           icon: Icons.calendar_month_outlined,
           route: RouteNames.bookings,
         ),
-      if (session.hasPermission(AppPermission.crmView))
+      if (session.hasAnyPermission({
+        AppPermission.crmView,
+        AppPermission.crmManage,
+      }))
         AppNavigationItem(
           label: l10n.crmNav,
           icon: Icons.people_outline,
           route: RouteNames.crm,
         ),
-      if (session.hasPermission(AppPermission.financeView))
+      if (session.hasAnyPermission({
+        AppPermission.financeView,
+        AppPermission.financeManage,
+      }))
         AppNavigationItem(
           label: l10n.financeNav,
           icon: Icons.account_balance_wallet_outlined,
           route: RouteNames.finance,
+        ),
+      if (session.hasAnyPermission({
+        AppPermission.notificationsView,
+        AppPermission.notificationsManage,
+      }))
+        AppNavigationItem(
+          label: l10n.notificationsNav,
+          icon: Icons.notifications_active_outlined,
+          route: RouteNames.notifications,
         ),
     ];
 
     return AppScaffold(
       title: l10n.routeTitleFor(currentLocation),
       currentLocation: currentLocation,
-      actions: [
-        const LocaleMenuButton(),
-        Padding(
-          padding: const EdgeInsetsDirectional.only(end: 8),
-          child: Chip(
-            avatar: const Icon(Icons.verified_user_outlined, size: 18),
-            label: Text(session.displayName),
-          ),
-        ),
-        IconButton(
-          tooltip: l10n.signOut,
-          onPressed: () =>
-              ref.read(sessionControllerProvider.notifier).signOut(),
-          icon: const Icon(Icons.logout),
-        ),
-      ],
+      actions: isCompact
+          ? [
+              const LocaleMenuButton(compact: true),
+              SessionActionMenu(
+                displayName: session.displayName,
+                subtitle: session.email,
+                signOutLabel: l10n.signOut,
+                onSignOut: () =>
+                    ref.read(sessionControllerProvider.notifier).signOut(),
+              ),
+            ]
+          : [
+              const LocaleMenuButton(),
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8),
+                child: Chip(
+                  avatar: const Icon(Icons.verified_user_outlined, size: 18),
+                  label: Text(session.displayName),
+                ),
+              ),
+              IconButton(
+                tooltip: l10n.signOut,
+                onPressed: () =>
+                    ref.read(sessionControllerProvider.notifier).signOut(),
+                icon: const Icon(Icons.logout),
+              ),
+            ],
       items: items,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

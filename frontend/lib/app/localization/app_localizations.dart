@@ -134,6 +134,8 @@ class AppLocalizations {
   String get bookingsTitle => isArabic ? 'تدفق الحجوزات' : 'Bookings Flow';
   String get crmTitle => isArabic ? 'إدارة العملاء' : 'Guest CRM';
   String get financeTitle => isArabic ? 'نبض المالية' : 'Finance Pulse';
+    String get notificationsTitle =>
+      isArabic ? 'مركز الإشعارات' : 'Notifications Center';
   String get maintenanceTitle =>
       isArabic ? 'مكتب الصيانة الميداني' : 'Maintenance Field Desk';
   String get housekeepingTitle =>
@@ -145,10 +147,48 @@ class AppLocalizations {
   String get bookingsNav => isArabic ? 'الحجوزات' : 'Bookings';
   String get crmNav => isArabic ? 'العملاء' : 'CRM';
   String get financeNav => isArabic ? 'المالية' : 'Finance';
+    String get notificationsNav => isArabic ? 'الإشعارات' : 'Notifications';
   String get maintenanceNav => isArabic ? 'الصيانة' : 'Maintenance';
   String get housekeepingNav => isArabic ? 'الإشراف' : 'Housekeeping';
   String get goOffline => isArabic ? 'التحول إلى وضع عدم الاتصال' : 'Go offline';
   String get goOnline => isArabic ? 'العودة إلى الاتصال' : 'Go online';
+    String notificationsUnreadCount(int count) =>
+      isArabic ? 'غير المقروءة: $count' : 'Unread: $count';
+    String get notificationsMarkAllRead =>
+      isArabic ? 'تعيين الكل كمقروء' : 'Mark all as read';
+    String get notificationsMarkRead =>
+      isArabic ? 'تعيين كمقروء' : 'Mark as read';
+    String get notificationsEmptyState =>
+      isArabic ? 'لا توجد إشعارات حتى الآن.' : 'No notifications yet.';
+    String get notificationsLoadErrorTitle => isArabic
+      ? 'تعذر تحميل الإشعارات'
+      : 'Unable to load notifications';
+    String get notificationsStatsUnavailable => isArabic
+      ? 'تعذر تحميل ملخص الإشعارات.'
+      : 'Notification summary is unavailable.';
+    String get notificationsPushCardTitle =>
+      isArabic ? 'تنبيهات المتصفح' : 'Browser Push';
+    String get notificationsPushCardReady => isArabic
+      ? 'يمكنك تفعيل تنبيهات OneSignal لهذا المتصفح وربطها بحسابك الحالي.'
+      : 'You can enable OneSignal browser push and link it to the current account.';
+    String get notificationsPushEnabled => isArabic
+      ? 'تم طلب تفعيل تنبيهات المتصفح لهذا الحساب.'
+      : 'Browser push has been requested for this account.';
+    String get notificationsPushUnavailable => isArabic
+      ? 'تنبيهات المتصفح غير متاحة حالياً أو لم يتم إعداد OneSignal بعد.'
+      : 'Browser push is unavailable right now or OneSignal is not configured yet.';
+    String get notificationsEnablePush =>
+      isArabic ? 'تفعيل تنبيهات المتصفح' : 'Enable browser push';
+    String get notificationsBroadcastTitle =>
+      isArabic ? 'إشعار عام من الإدارة' : 'Admin Broadcast';
+    String get notificationsBroadcastSubjectLabel =>
+      isArabic ? 'العنوان' : 'Title';
+    String get notificationsBroadcastBodyLabel =>
+      isArabic ? 'نص الإشعار' : 'Message';
+    String get notificationsBroadcastAction =>
+      isArabic ? 'إرسال الإشعار' : 'Send broadcast';
+    String get notificationsBroadcastSent =>
+      isArabic ? 'تم إرسال الإشعار العام.' : 'The broadcast notification was sent.';
 
   String routeTitleFor(String location) {
     if (location.startsWith('/app/reports')) {
@@ -168,6 +208,9 @@ class AppLocalizations {
     }
     if (location.startsWith('/app/finance')) {
       return financeTitle;
+    }
+    if (location.startsWith('/app/notifications')) {
+      return notificationsTitle;
     }
     if (location.startsWith('/worker/maintenance')) {
       return maintenanceTitle;
@@ -217,6 +260,8 @@ class AppLocalizations {
         return crmNav;
       case 'finance':
         return financeNav;
+      case 'notifications':
+        return notificationsNav;
       case 'housekeeping':
         return housekeepingNav;
       case 'maintenance':
@@ -264,6 +309,10 @@ class AppLocalizations {
         return 'عرض الصيانة';
       case 'maintenance.manage':
         return 'إدارة الصيانة';
+      case 'notifications.view':
+        return 'عرض الإشعارات';
+      case 'notifications.manage':
+        return 'إدارة الإشعارات';
       case 'reports.view':
         return 'عرض التقارير';
       case 'users.view':
@@ -308,6 +357,10 @@ class AppLocalizations {
         return 'عرض تذاكر الصيانة.';
       case 'maintenance.manage':
         return 'إنشاء تذاكر الصيانة وإغلاقها.';
+      case 'notifications.view':
+        return 'عرض الإشعارات الشخصية والتنبيهات التشغيلية.';
+      case 'notifications.manage':
+        return 'إرسال الإشعارات العامة ومتابعة التنبيهات الإدارية.';
       case 'reports.view':
         return 'الوصول إلى التقارير التشغيلية والمالية.';
       case 'users.view':
@@ -392,6 +445,19 @@ class AppLocalizations {
         return isArabic ? 'مكتملة' : 'Completed';
       default:
         return status;
+    }
+  }
+
+  String notificationKindLabel(String kind) {
+    switch (kind) {
+      case 'housekeeping':
+        return isArabic ? 'تنظيف' : 'Housekeeping';
+      case 'maintenance':
+        return isArabic ? 'صيانة' : 'Maintenance';
+      case 'auth':
+        return isArabic ? 'دخول وخروج' : 'Auth';
+      default:
+        return isArabic ? 'عام' : 'General';
     }
   }
 

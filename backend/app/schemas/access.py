@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.enums import AccessOverrideEffect, OperationTeamType
 
@@ -10,6 +10,19 @@ class PermissionRead(BaseModel):
     name: str
     module: str
     description: str
+
+
+class PermissionGroupRead(BaseModel):
+    code: str
+    name: str
+    permission_codes: list[str]
+    is_system: bool
+    member_count: int
+
+
+class PermissionGroupUpsert(BaseModel):
+    name: str = Field(min_length=2)
+    permission_codes: list[str] = []
 
 
 class PermissionOverrideRead(BaseModel):
@@ -42,6 +55,16 @@ class UserAccessRead(UserListItemRead):
 
 class UserAccessUpdate(BaseModel):
     role_codes: list[str]
+    overrides: list[PermissionOverrideRead] = []
+    assigned_unit_ids: list[str] = []
+
+
+class UserCreate(BaseModel):
+    full_name: str = Field(min_length=2)
+    email: EmailStr
+    password: str = Field(min_length=8)
+    is_active: bool = True
+    role_codes: list[str] = []
     overrides: list[PermissionOverrideRead] = []
     assigned_unit_ids: list[str] = []
 

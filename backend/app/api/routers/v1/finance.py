@@ -212,7 +212,10 @@ def _payment_revenue_amount(payment: Payment) -> float:
 
 @router.get("/payments", response_model=list[PaymentRead])
 def list_payments(
-    user: Annotated[CurrentUser, Depends(require_permissions("finance.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("finance.view", "finance.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
     period: FinancePeriod = FINANCE_PERIOD_QUERY,
     anchor_date: date | None = FINANCE_ANCHOR_DATE_QUERY,
@@ -271,7 +274,10 @@ def create_payment(
 
 @router.get("/expenses", response_model=list[ExpenseRead])
 def list_expenses(
-    user: Annotated[CurrentUser, Depends(require_permissions("finance.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("finance.view", "finance.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
     period: FinancePeriod = FINANCE_PERIOD_QUERY,
     anchor_date: date | None = FINANCE_ANCHOR_DATE_QUERY,
@@ -331,7 +337,10 @@ def create_expense(
 
 @router.get("/assets", response_model=list[AssetRead])
 def list_assets(
-    user: Annotated[CurrentUser, Depends(require_permissions("finance.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("finance.view", "finance.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
     period: FinancePeriod = FINANCE_PERIOD_QUERY,
     anchor_date: date | None = FINANCE_ANCHOR_DATE_QUERY,
@@ -425,7 +434,10 @@ def create_asset(
 
 @router.get("/cost-centers", response_model=list[UnitCostCenterRead])
 def list_cost_centers(
-    user: Annotated[CurrentUser, Depends(require_permissions("finance.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("finance.view", "finance.manage")),
+    ],
     session: Annotated[Session, Depends(get_session)],
     period: FinancePeriod = FINANCE_PERIOD_QUERY,
     anchor_date: date | None = FINANCE_ANCHOR_DATE_QUERY,

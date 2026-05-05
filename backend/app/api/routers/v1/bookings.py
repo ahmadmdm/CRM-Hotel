@@ -47,7 +47,10 @@ def _ensure_unit_available(
 
 @router.get("", response_model=PaginatedResponse[BookingRead])
 def list_bookings(
-    user: Annotated[CurrentUser, Depends(require_permissions("bookings.view"))],
+    user: Annotated[
+        CurrentUser,
+        Depends(require_permissions("bookings.view", "bookings.manage")),
+    ],
     pagination: Annotated[PaginationParams, Depends(pagination_params)],
     session: Annotated[Session, Depends(get_session)],
 ) -> PaginatedResponse[BookingRead]:

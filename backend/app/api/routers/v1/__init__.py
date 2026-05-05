@@ -9,6 +9,7 @@ from app.api.routers.v1 import (
     health,
     housekeeping,
     maintenance,
+    notifications,
     reports,
     units,
     users,
@@ -24,5 +25,6 @@ api_router.include_router(bookings.router, prefix="/bookings", tags=["bookings"]
 api_router.include_router(clients.router, prefix="/clients", tags=["clients"])
 api_router.include_router(housekeeping.router, prefix="/housekeeping", tags=["housekeeping"])
 api_router.include_router(maintenance.router, prefix="/maintenance", tags=["maintenance"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])

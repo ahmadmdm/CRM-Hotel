@@ -138,6 +138,334 @@ def test_super_admin_can_update_user_access_and_login_reflects_effective_permiss
     assert granted_unit_create_response.status_code == 200
 
 
+def test_super_admin_can_create_user_and_login_with_assigned_scope() -> None:
+    client = create_client(seed=True)
+
+    units_response = client.get("/api/v1/units", headers=SUPER_ADMIN_HEADERS)
+    assert units_response.status_code == 200
+    palm_suite = next(
+        item for item in units_response.json()["items"] if item["code"] == "U-101"
+    )
+
+    create_response = client.post(
+        "/api/v1/users",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "full_name": "Operations Dispatcher",
+            "email": "dispatcher@crmhotel.example.com",
+            "password": "ChangeMe123!",
+            "is_active": True,
+            "role_codes": ["operations"],
+            "overrides": [],
+            "assigned_unit_ids": [palm_suite["id"]],
+        },
+    )
+    assert create_response.status_code == 200
+    payload = create_response.json()
+    assert payload["email"] == "dispatcher@crmhotel.example.com"
+    assert payload["role_codes"] == ["operations"]
+    assert payload["assigned_unit_ids"] == [palm_suite["id"]]
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "dispatcher@crmhotel.example.com",
+            "password": "ChangeMe123!",
+        },
+    )
+    assert login_response.status_code == 200
+
+    scoped_units_response = client.get(
+        "/api/v1/units",
+        headers={"Authorization": f"Bearer {login_response.json()['access_token']}"},
+    )
+    assert scoped_units_response.status_code == 200
+    assert [item["code"] for item in scoped_units_response.json()["items"]] == ["U-101"]
+
+
+def test_super_admin_can_delete_user_and_login_fails_afterward() -> None:
+    client = create_client(seed=True)
+
+    create_response = client.post(
+        "/api/v1/users",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "full_name": "Delete Me",
+            "email": "delete-me@crmhotel.example.com",
+            "password": "ChangeMe123!",
+            "is_active": True,
+            "role_codes": ["operations"],
+            "overrides": [],
+            "assigned_unit_ids": [],
+        },
+    )
+    assert create_response.status_code == 200
+    user_id = create_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/api/v1/users/{user_id}",
+        headers=SUPER_ADMIN_HEADERS,
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"ok": True}
+
+    users_response = client.get("/api/v1/users", headers=SUPER_ADMIN_HEADERS)
+    assert users_response.status_code == 200
+    assert all(
+        user["email"] != "delete-me@crmhotel.example.com"
+        for user in users_response.json()
+    )
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "delete-me@crmhotel.example.com",
+            "password": "ChangeMe123!",
+        },
+    )
+    assert login_response.status_code == 401
+
+
+def test_user_cannot_delete_own_account() -> None:
+    client = create_client(seed=True)
+
+    admin_headers = _login_headers(client, "admin@crmhotel.example.com")
+    users_response = client.get("/api/v1/users", headers=admin_headers)
+    assert users_response.status_code == 200
+    admin_user = next(
+        item for item in users_response.json() if item["email"] == "admin@crmhotel.example.com"
+    )
+
+    delete_response = client.delete(
+        f"/api/v1/users/{admin_user['id']}",
+        headers=admin_headers,
+    )
+    assert delete_response.status_code == 403
+    assert delete_response.json()["error"]["code"] == "CANNOT_DELETE_SELF"
+
+
+def test_custom_permission_group_updates_propagate_to_all_assigned_users() -> None:
+    client = create_client(seed=True)
+
+    create_group_response = client.post(
+        "/api/v1/access/permission-groups",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "name": "Front Desk Shared",
+            "permission_codes": ["dashboard.view", "bookings.view"],
+        },
+    )
+    assert create_group_response.status_code == 200
+    group_payload = create_group_response.json()
+    group_code = group_payload["code"]
+    assert group_code.startswith("custom_")
+    assert group_payload["member_count"] == 0
+    assert group_payload["is_system"] is False
+
+    for index in range(2):
+        create_user_response = client.post(
+            "/api/v1/users",
+            headers=SUPER_ADMIN_HEADERS,
+            json={
+                "full_name": f"Front Desk Agent {index + 1}",
+                "email": f"frontdesk{index + 1}@crmhotel.example.com",
+                "password": "ChangeMe123!",
+                "is_active": True,
+                "role_codes": [group_code],
+                "overrides": [],
+                "assigned_unit_ids": [],
+            },
+        )
+        assert create_user_response.status_code == 200
+        assert create_user_response.json()["role_codes"] == [group_code]
+
+    first_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "frontdesk1@crmhotel.example.com",
+            "password": "ChangeMe123!",
+        },
+    )
+    second_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "frontdesk2@crmhotel.example.com",
+            "password": "ChangeMe123!",
+        },
+    )
+    assert first_login.status_code == 200
+    assert second_login.status_code == 200
+    assert set(first_login.json()["permissions"]) == {"dashboard.view", "bookings.view"}
+    assert set(second_login.json()["permissions"]) == {"dashboard.view", "bookings.view"}
+
+    denied_units_response = client.get(
+        "/api/v1/units",
+        headers={"Authorization": f"Bearer {first_login.json()['access_token']}"},
+    )
+    assert denied_units_response.status_code == 403
+
+    update_group_response = client.patch(
+        f"/api/v1/access/permission-groups/{group_code}",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "name": "Front Desk Shared",
+            "permission_codes": ["dashboard.view", "bookings.view", "units.view"],
+        },
+    )
+    assert update_group_response.status_code == 200
+    assert update_group_response.json()["member_count"] == 2
+    assert set(update_group_response.json()["permission_codes"]) == {
+        "dashboard.view",
+        "bookings.view",
+        "units.view",
+    }
+
+    refreshed_login = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "frontdesk1@crmhotel.example.com",
+            "password": "ChangeMe123!",
+        },
+    )
+    assert refreshed_login.status_code == 200
+    assert set(refreshed_login.json()["permissions"]) == {
+        "dashboard.view",
+        "bookings.view",
+        "units.view",
+    }
+
+    allowed_units_response = client.get(
+        "/api/v1/units",
+        headers={"Authorization": f"Bearer {refreshed_login.json()['access_token']}"},
+    )
+    assert allowed_units_response.status_code == 200
+
+
+def test_sub_admin_can_create_and_assign_operational_custom_permission_group() -> None:
+    client = create_client(seed=True)
+
+    create_group_response = client.post(
+        "/api/v1/access/permission-groups",
+        headers=SUB_ADMIN_HEADERS,
+        json={
+            "name": "Maintenance Dispatch Lite",
+            "permission_codes": ["maintenance.view"],
+        },
+    )
+    assert create_group_response.status_code == 200
+    group_code = create_group_response.json()["code"]
+
+    create_user_response = client.post(
+        "/api/v1/users",
+        headers=SUB_ADMIN_HEADERS,
+        json={
+            "full_name": "Maintenance Lite",
+            "email": "maintenance-lite@crmhotel.example.com",
+            "password": "ChangeMe123!",
+            "is_active": True,
+            "role_codes": [group_code],
+            "overrides": [],
+            "assigned_unit_ids": [],
+        },
+    )
+    assert create_user_response.status_code == 200
+    assert create_user_response.json()["role_codes"] == [group_code]
+
+    blocked_group_response = client.post(
+        "/api/v1/access/permission-groups",
+        headers=SUB_ADMIN_HEADERS,
+        json={
+            "name": "Blocked Admin Access Group",
+            "permission_codes": ["users.manage_access"],
+        },
+    )
+    assert blocked_group_response.status_code == 403
+    assert blocked_group_response.json()["error"]["code"] == "PERMISSION_GROUP_FORBIDDEN"
+
+
+def test_custom_permission_group_deletion_is_blocked_while_group_is_assigned() -> None:
+    client = create_client(seed=True)
+
+    create_group_response = client.post(
+        "/api/v1/access/permission-groups",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "name": "Temporary Front Desk Group",
+            "permission_codes": ["dashboard.view"],
+        },
+    )
+    assert create_group_response.status_code == 200
+    group_code = create_group_response.json()["code"]
+
+    create_user_response = client.post(
+        "/api/v1/users",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "full_name": "Temporary Front Desk Agent",
+            "email": "temporary-frontdesk@crmhotel.example.com",
+            "password": "ChangeMe123!",
+            "is_active": True,
+            "role_codes": [group_code],
+            "overrides": [],
+            "assigned_unit_ids": [],
+        },
+    )
+    assert create_user_response.status_code == 200
+    user_id = create_user_response.json()["id"]
+
+    blocked_delete_response = client.delete(
+        f"/api/v1/access/permission-groups/{group_code}",
+        headers=SUPER_ADMIN_HEADERS,
+    )
+    assert blocked_delete_response.status_code == 409
+    assert blocked_delete_response.json()["error"]["code"] == "PERMISSION_GROUP_IN_USE"
+
+    unassign_response = client.patch(
+        f"/api/v1/users/{user_id}/access",
+        headers=SUPER_ADMIN_HEADERS,
+        json={
+            "role_codes": [],
+            "overrides": [],
+            "assigned_unit_ids": [],
+        },
+    )
+    assert unassign_response.status_code == 200
+
+    delete_response = client.delete(
+        f"/api/v1/access/permission-groups/{group_code}",
+        headers=SUPER_ADMIN_HEADERS,
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.json() == {"ok": True}
+
+    groups_response = client.get(
+        "/api/v1/access/permission-groups",
+        headers=SUPER_ADMIN_HEADERS,
+    )
+    assert groups_response.status_code == 200
+    assert all(group["code"] != group_code for group in groups_response.json())
+
+
+def test_sub_admin_cannot_create_admin_user() -> None:
+    client = create_client(seed=True)
+
+    create_response = client.post(
+        "/api/v1/users",
+        headers=SUB_ADMIN_HEADERS,
+        json={
+            "full_name": "Blocked Admin Clone",
+            "email": "blocked-admin@crmhotel.example.com",
+            "password": "ChangeMe123!",
+            "is_active": True,
+            "role_codes": ["super_admin"],
+            "overrides": [],
+            "assigned_unit_ids": [],
+        },
+    )
+    assert create_response.status_code == 403
+    assert create_response.json()["error"]["code"] == "ROLE_ASSIGNMENT_FORBIDDEN"
+
+
 def test_unit_scoped_operations_routes_are_filtered_by_assignment() -> None:
     client = create_client(seed=True)
 

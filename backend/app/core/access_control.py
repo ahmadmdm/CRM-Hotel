@@ -130,6 +130,18 @@ PERMISSION_CATALOG: tuple[PermissionDefinition, ...] = (
         module="access",
         description="Manage user roles and per-user permission overrides.",
     ),
+    PermissionDefinition(
+        code="notifications.view",
+        name="Notifications View",
+        module="notifications",
+        description="View personal and operational notifications.",
+    ),
+    PermissionDefinition(
+        code="notifications.manage",
+        name="Notifications Manage",
+        module="notifications",
+        description="Broadcast general notices and manage notification operations.",
+    ),
 )
 
 ALL_PERMISSION_CODES = frozenset(definition.code for definition in PERMISSION_CATALOG)
@@ -153,6 +165,8 @@ ROLE_PERMISSION_CODES: dict[str, frozenset[str]] = {
             "reports.view",
             "users.view",
             "users.manage_access",
+            "notifications.view",
+            "notifications.manage",
         }
     ),
     "financial": frozenset(
@@ -164,6 +178,7 @@ ROLE_PERMISSION_CODES: dict[str, frozenset[str]] = {
             "finance.view",
             "finance.manage",
             "reports.view",
+            "notifications.view",
         }
     ),
     "operations": frozenset(
@@ -175,11 +190,18 @@ ROLE_PERMISSION_CODES: dict[str, frozenset[str]] = {
             "crm.view",
             "crm.manage",
             "reports.view",
+            "notifications.view",
         }
     ),
-    "maintenance": frozenset({"maintenance.view", "maintenance.manage"}),
-    "housekeeping": frozenset({"housekeeping.view", "housekeeping.complete"}),
+    "maintenance": frozenset(
+        {"maintenance.view", "maintenance.manage", "notifications.view"}
+    ),
+    "housekeeping": frozenset(
+        {"housekeeping.view", "housekeeping.complete", "notifications.view"}
+    ),
 }
+
+SYSTEM_ROLE_CODES = frozenset(ROLE_PERMISSION_CODES)
 
 SUB_ADMIN_ASSIGNABLE_ROLE_CODES = frozenset(
     {"financial", "operations", "maintenance", "housekeeping"}
@@ -233,6 +255,32 @@ def get_role_codes_for_user(session: Session, user_id: str) -> list[str]:
         .order_by(Role.code)
     ).all()
     return sorted(role_codes)
+
+
+def get_role_permission_codes_map(
+    session: Session,
+    role_codes: Iterable[str] | None = None,
+) -> dict[str, list[str]]:
+    requested_role_codes = sorted(set(role_codes or []))
+    statement = (
+        select(Role.code, Permission.code)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .order_by(Role.code, Permission.code)
+    )
+    if requested_role_codes:
+        statement = statement.where(Role.code.in_(requested_role_codes))
+
+    permission_map: dict[str, set[str]] = {
+        role_code: set() for role_code in requested_role_codes
+    }
+    for role_code, permission_code in session.exec(statement).all():
+        permission_map.setdefault(role_code, set()).add(permission_code)
+
+    return {
+        role_code: sorted(permission_codes)
+        for role_code, permission_codes in sorted(permission_map.items())
+    }
 
 
 def get_inherited_permission_codes_for_user(session: Session, user_id: str) -> list[str]:

@@ -9,6 +9,8 @@ import '../localization/locale_controller.dart';
 import '../localization/locale_storage.dart';
 import '../routing/app_router.dart';
 import '../theme/app_theme.dart';
+import '../../core/auth/session_controller.dart';
+import '../../core/notifications/notification_delivery_coordinator.dart';
 
 class CrmHotelApp extends ConsumerWidget {
   const CrmHotelApp({super.key});
@@ -20,6 +22,13 @@ class CrmHotelApp extends ConsumerWidget {
         return;
       }
       unawaited(ref.read(localeStorageProvider).writeLocale(next));
+    });
+    ref.listen(sessionControllerProvider, (previous, next) {
+      unawaited(
+        ref
+            .read(notificationDeliveryCoordinatorProvider)
+            .syncSession(next.valueOrNull),
+      );
     });
 
     final router = ref.watch(appRouterProvider);

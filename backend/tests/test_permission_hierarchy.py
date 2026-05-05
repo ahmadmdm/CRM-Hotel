@@ -276,6 +276,28 @@ def test_permission_audit_users_can_only_access_their_assigned_slice() -> None:
         assert denied_response.status_code == 403, scenario.permission_code
 
 
+def test_manage_and_complete_permissions_can_load_their_primary_lists() -> None:
+    client = create_client(seed=True)
+
+    scenarios = [
+        ("units.manage", "GET", "/api/v1/units"),
+        ("bookings.manage", "GET", "/api/v1/bookings"),
+        ("crm.manage", "GET", "/api/v1/clients"),
+        ("finance.manage", "GET", "/api/v1/finance/payments"),
+        ("maintenance.manage", "GET", "/api/v1/maintenance/tickets"),
+        ("housekeeping.complete", "GET", "/api/v1/housekeeping/tasks"),
+        ("housekeeping.manage", "GET", "/api/v1/housekeeping/tasks"),
+        ("users.manage_access", "GET", "/api/v1/users"),
+        ("users.manage_access", "GET", "/api/v1/access/permissions-catalog"),
+        ("users.manage_access", "GET", "/api/v1/access/operation-teams"),
+    ]
+
+    for permission_code, method, path in scenarios:
+        headers = _auth_headers_for_login(client, _permission_audit_email(permission_code))
+        response = client.request(method, path, headers=headers)
+        assert response.status_code == 200, (permission_code, path, response.text)
+
+
 def test_role_hierarchy_stays_within_expected_boundaries() -> None:
     client = create_client(seed=True)
     seeded_ids = _seeded_resource_ids()

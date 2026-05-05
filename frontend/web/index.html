@@ -31,6 +31,100 @@
 
   <title>crmhotel_frontend</title>
   <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.crmHotelOneSignal = (() => {
+      let initializedAppId = null;
+      let currentExternalId = null;
+
+      function notificationUrl() {
+        return new URL('#/app/notifications', document.baseURI).toString();
+      }
+
+      function run(action) {
+        return new Promise((resolve, reject) => {
+          window.OneSignalDeferred.push(async function (OneSignal) {
+            try {
+              const result = await action(OneSignal);
+              resolve(result ?? true);
+            } catch (error) {
+              reject(error);
+            }
+          });
+        });
+      }
+
+      return {
+        init(config) {
+          if (!config || !config.appId) {
+            return Promise.resolve(false);
+          }
+          return run(async function (OneSignal) {
+            if (initializedAppId !== config.appId) {
+              await OneSignal.init({
+                appId: config.appId,
+                serviceWorkerPath: config.serviceWorkerPath || 'push/onesignal/OneSignalSDKWorker.js',
+                serviceWorkerParam: {
+                  scope: config.serviceWorkerScope || '/push/onesignal/',
+                },
+                autoResubscribe: true,
+                welcomeNotification: { disable: true },
+                notifyButton: { enable: false },
+                notificationClickHandlerMatch: 'origin',
+                notificationClickHandlerAction: 'navigate',
+              });
+              initializedAppId = config.appId;
+            }
+            OneSignal.Notifications.setDefaultUrl(notificationUrl());
+            return true;
+          });
+        },
+        login(externalId) {
+          if (!externalId) {
+            return Promise.resolve(false);
+          }
+          return run(async function (OneSignal) {
+            if (currentExternalId !== externalId) {
+              await OneSignal.login(externalId);
+              currentExternalId = externalId;
+            }
+            return true;
+          });
+        },
+        logout() {
+          return run(async function (OneSignal) {
+            if (initializedAppId) {
+              await OneSignal.logout();
+            }
+            currentExternalId = null;
+            return true;
+          });
+        },
+        promptPush() {
+          return run(async function (OneSignal) {
+            if (!OneSignal.Notifications.isPushSupported()) {
+              return false;
+            }
+            if (OneSignal.Notifications.permission) {
+              if (OneSignal.User.PushSubscription.optedIn === false) {
+                await OneSignal.User.PushSubscription.optIn();
+              }
+              return true;
+            }
+            await OneSignal.Notifications.requestPermission();
+            if (
+              OneSignal.Notifications.permission &&
+              OneSignal.User.PushSubscription.optedIn === false
+            ) {
+              await OneSignal.User.PushSubscription.optIn();
+            }
+            return !!OneSignal.Notifications.permission;
+          });
+        },
+      };
+    })();
+  </script>
 </head>
 <body>
   <!--
@@ -41,6 +135,29 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    (async function loadFlutterBootstrap() {
+      let buildId = Date.now().toString();
+
+      try {
+        const response = await fetch(`.last_build_id?ts=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (response.ok) {
+          const resolvedBuildId = (await response.text()).trim();
+          if (resolvedBuildId) {
+            buildId = resolvedBuildId;
+          }
+        }
+      } catch (_) {
+        // Fall back to a timestamp when the build id cannot be fetched.
+      }
+
+      const bootstrapScript = document.createElement('script');
+      bootstrapScript.src = `flutter_bootstrap.js?v=${encodeURIComponent(buildId)}`;
+      bootstrapScript.async = true;
+      document.body.appendChild(bootstrapScript);
+    })();
+  </script>
 </body>
 </html>
